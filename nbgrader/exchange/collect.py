@@ -61,7 +61,6 @@ class ExchangeCollect(Exchange):
         # change sourse to http submit
         if self.enable_http_submit:
             self.log.info("Collecting from http submit ", self.http_submit_path)
-            #FIXME: http path is hard coded, change it
             zipped_submission_list = [zipped_sub for zipped_sub in os.listdir(self.http_submit_path) if os.path.splitext(zipped_sub)[1] == ".zip"]
             print ("zipped submission ", zipped_submission_list)            
             self.log.info("Unpacking submission....")
@@ -99,7 +98,7 @@ class ExchangeCollect(Exchange):
                 self.log.info("[{}] Total submission: ".format(username, len(records)))
                 #update file path
                 for i,record in enumerate(records):
-                    filename = os.path.join(submit_path,record['filename'])
+                    filename = os.path.join(username,record['filename'])
                     records[i]['filename'] = filename
                 
                 usergroups = groupby(records, lambda item: item['username'])
@@ -166,8 +165,9 @@ class ExchangeCollect(Exchange):
                     updating = True
             else:
                 copy = True
-            print ("src: ", src_path)
-            print ("dst: ", dest_path)
+
+            self.log.info ("src: {}".format(src_path))
+            self.log.info ("dst: {}".format(dest_path))
             if copy:
                 if updating:
                     self.log.info("Updating submission: {} {}".format(student_id, self.coursedir.assignment_id))
@@ -177,9 +177,11 @@ class ExchangeCollect(Exchange):
                         shutil.rmtree(hashed_dest_path)
                 else:
                     self.log.info("Collecting submission: {} {}".format(student_id, self.coursedir.assignment_id))
+
                 if not self.do_copy(src_path, dest_path):
                     self.log.error("Inbound path should be rwx by instructor: sudo chmod -R o+rwx {}".format(self.inbound_path))
                     return 
+                
                 # Create hashed_submission
                 self.do_copy(src_path, hashed_dest_path)
             else:
