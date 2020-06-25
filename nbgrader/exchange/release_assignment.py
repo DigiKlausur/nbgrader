@@ -91,17 +91,10 @@ class ExchangeReleaseAssignment(Exchange):
         )
         # 0733 with set GID so student submission will have the instructors group
         # groupshared: +0040
-        # inbound is o+rwx for restricted submit
-        if self.personalized_inbound:
-            self.ensure_directory(
-                self.inbound_path,
-                S_ISGID|S_IRUSR|S_IWUSR|S_IXUSR|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH|(S_IRGRP if self.coursedir.groupshared else 0)
-            )
-        else:
-            self.ensure_directory(
-                self.inbound_path,
-                S_ISGID|S_IRUSR|S_IWUSR|S_IXUSR|S_IWGRP|S_IXGRP|S_IWOTH|S_IXOTH|(S_IRGRP if self.coursedir.groupshared else 0)
-            )
+        self.ensure_directory(
+            self.inbound_path,
+            S_ISGID|S_IRUSR|S_IWUSR|S_IXUSR|S_IWGRP|S_IXGRP|S_IWOTH|S_IXOTH|(S_IRGRP if self.coursedir.groupshared else 0)
+        )
             
     def copy_files(self):
         if os.path.isdir(self.dest_path):
