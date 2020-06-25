@@ -73,7 +73,7 @@ class ExchangeCollect(Exchange):
         elif self.enable_k8s_submit:
             self.inbound_path = os.path.join(self.course_path, self.k8s_inbound) 
         else:
-            self.inbound_path = os.path.join(self.course_path, 'inbound')
+            self.inbound_path = os.path.join(self.course_path, self.inbound_dir)
 
         if not os.path.isdir(self.inbound_path):
             self.fail("Course not found: {}".format(self.inbound_path))
@@ -82,7 +82,7 @@ class ExchangeCollect(Exchange):
             self.fail("You don't have read permissions for the directory: {}".format(self.inbound_path))
 
         #look into student id dir if submission dir is restricted
-        if self.restrict_submit:
+        if self.personalized_inbound:
             self.log.info("Collecting from restricted submit dirs")
             #skip dir that contains nbgrader submit patter, take dir with username only e.g. mwasil2s
             submit_dirs = [username for username in os.listdir(self.inbound_path) if "+" not in username and 

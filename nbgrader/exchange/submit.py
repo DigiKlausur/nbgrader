@@ -56,10 +56,10 @@ class ExchangeSubmit(Exchange):
             self.fail("You do not have access to this course.")
        
         #each student has their own submit dir (only works with k8s)
-        if self.restrict_submit:
-            self.inbound_path = os.path.join(self.root, self.coursedir.course_id, 'inbound', os.getenv('JUPYTERHUB_USER'))
+        if self.personalized_inbound:
+            self.inbound_path = os.path.join(self.root, self.coursedir.course_id, self.inbound_dir, os.getenv('JUPYTERHUB_USER'))
         else:
-            self.inbound_path = os.path.join(self.root, self.coursedir.course_id, 'inbound')
+            self.inbound_path = os.path.join(self.root, self.coursedir.course_id, self.inbound_dir)
 
         if not os.path.isdir(self.inbound_path):
             self.fail("Inbound directory doesn't exist: {}".format(self.inbound_path))

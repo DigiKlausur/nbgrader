@@ -120,11 +120,18 @@ class Exchange(LoggingConfigurable):
         help="Exchange outbound directory"
     ).tag(config=True)
 
-    restrict_submit = Bool(
+    personalized_inbound = Bool(
         False,
         help=dedent(
             "Whether to create submit directory for each JupyterHub user"
             "This only works with k8s and needs JupyterHub"
+        )
+    ).tag(config=True)
+
+    inbound_dir = Unicode(
+        "inbound",
+        help=dedent(
+            "Which inbound directory to use"
         )
     ).tag(config=True)
     
@@ -153,6 +160,9 @@ class Exchange(LoggingConfigurable):
         self.ow_perms = (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IWOTH)
         self.orx_perms = (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IXOTH)
         self.orwx_perms = (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH)
+
+        if self.personalized_inbound:
+            self.inbound_dir = "personalized-inbound"
         if self.personalized_outbound:
             self.outbound_dir = "personalized-outbound"
 
