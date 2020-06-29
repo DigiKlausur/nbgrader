@@ -75,6 +75,7 @@ class ExchangeReleaseAssignment(Exchange):
         self.course_path = os.path.join(self.root, self.coursedir.course_id)
         self.outbound_path = os.path.join(self.course_path, self.outbound_dir)
         self.inbound_path = os.path.join(self.course_path, self.inbound_dir)
+        self.outbound_feedback_path = os.path.join(self.course_path, 'feedback')
         self.dest_path = os.path.join(self.outbound_path, self.coursedir.assignment_id)
         
         # 0755
@@ -94,6 +95,13 @@ class ExchangeReleaseAssignment(Exchange):
         self.ensure_directory(
             self.inbound_path,
             S_ISGID|S_IRUSR|S_IWUSR|S_IXUSR|S_IWGRP|S_IXGRP|S_IWOTH|S_IXOTH|(S_IRGRP if self.coursedir.groupshared else 0)
+        )
+        # Create feedback dir when releasing assignment to avoid failing mount if using kubernetes
+        # 0755
+        self.ensure_directory(
+            self.outbound_feedback_path,
+            (S_IRUSR | S_IWUSR | S_IXUSR | S_IXGRP | S_IXOTH |
+             ((S_IRGRP|S_IWGRP|S_ISGID) if self.coursedir.groupshared else 0))
         )
             
     def copy_files(self):
