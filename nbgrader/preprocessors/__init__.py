@@ -20,6 +20,7 @@ from .unscramble import Unscramble
 from .filtercellsbyid import FilterCellsById
 from .scramble import Scramble
 from .permutetasks import PermuteTasks
+from .validateextracells import ValidateExtraCells
 
 __all__ = [
     "AssignLatePenalties",
@@ -42,5 +43,6 @@ __all__ = [
     "Unscramble",
     "FilterCellsById",
     "Scramble",
-    "PermuteTasks"
+    "PermuteTasks",
+    "ValidateExtraCells",
 ]

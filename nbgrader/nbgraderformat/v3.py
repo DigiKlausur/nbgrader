@@ -5,8 +5,35 @@ import typing
 from .v1 import MetadataValidatorV1
 from .v2 import MetadataValidatorV2
 from .common import BaseMetadataValidator, ValidationError
+from ..utils import is_grade, is_solution, is_locked, is_singlechoice
 from nbformat.notebooknode import NotebookNode
 
+class ExtraCellValidator(BaseMetadataValidator):
+
+    def __init__(self):
+        super(ExtraCellValidator, self).__init__(3)
+
+    def validate_cell(self, cell):
+
+        if 'nbgrader' not in cell.metadata:
+            return
+
+        meta = cell.metadata['nbgrader']
+        grade = meta['grade']
+        solution = meta['solution']
+        locked = meta['locked']
+        task = meta.get('task', False)
+
+        # check if there is a single choice cell without a solution
+        if is_singlechoice(cell):
+            extended_metadata = cell.metadata.extended_cell
+            if (not 'choice' in extended_metadata) or (len(extended_metadata.choice) < 1):
+                raise ValidationError("single choice nbgrader cell {} does not have a solution".format(cell.metadata.nbgrader.grade_id))
+
+    def validate_nb(self, nb):
+        ids = set([])
+        for cell in nb.cells:
+            self.validate_cell(cell)
 
 class MetadataValidatorV3(BaseMetadataValidator):
 
