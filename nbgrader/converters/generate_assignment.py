@@ -16,6 +16,7 @@ from ..preprocessors import (
     ClearOutput,
     ClearHiddenTests,
     ClearMarkScheme,
+    ValidateExtraCells,
 )
 
 
@@ -53,6 +54,7 @@ class GenerateAssignment(BaseConverter):
         return self.coursedir.release_directory
 
     preprocessors = List([
+        ValidateExtraCells,
         IncludeHeaderFooter,
         LockCells,
         ClearSolutions,
