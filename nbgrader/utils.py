@@ -151,7 +151,7 @@ def determine_grade(cell: NotebookNode, log: Logger = None) -> Tuple[Optional[fl
             # Get the instructor choices
             instructor_choices = get_instructor_choices(cell)
 
-            if (len(student_choices) > 0) and (student_choices[0] == instructor_choices[0]):
+            if (len(student_choices) > 0) and (len(instructor_choices) > 0) and (student_choices[0] == instructor_choices[0]):
                 return max_points, max_points
             else:
                 return 0, max_points
