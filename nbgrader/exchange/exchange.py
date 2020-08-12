@@ -7,8 +7,9 @@ import glob
 from textwrap import dedent
 
 from dateutil.tz import gettz
+from dateutil.parser import parse
 from traitlets.config import LoggingConfigurable
-from traitlets import Unicode, Bool, Instance, Type, default, validate
+from traitlets import Unicode, Bool, Instance, Type, default, validate, TraitError
 from jupyter_core.paths import jupyter_data_dir
 
 from ..utils import check_directory, ignore_patterns, self_owned
@@ -44,6 +45,15 @@ class Exchange(LoggingConfigurable):
         help="Format string for timestamps"
     ).tag(config=True)
 
+    @validate('timestamp_format')
+    def _valid_timestamp_format(self, proposal):
+        try:
+            ts = datetime.datetime.now().strftime(proposal['value'])
+            ts = parse(ts)
+        except ValueError:
+            raise TraitError('Invalid timestamp_format: {} - could not be parsed by dateutil'.format(proposal['value']))
+        return proposal['value']
+    
     root = Unicode(
         "/srv/nbgrader/exchange",
         help="The nbgrader exchange directory writable to everyone. MUST be preexisting."
@@ -52,6 +62,26 @@ class Exchange(LoggingConfigurable):
     cache = Unicode(
         "",
         help="Local cache directory for nbgrader submit and nbgrader list. Defaults to $JUPYTER_DATA_DIR/nbgrader_cache"
+    ).tag(config=True)
+    
+    enable_http_submit = Bool(
+        False,
+        help="Enable submission via http"
+    ).tag(config=True)
+    
+    http_url = Unicode(
+        "",
+        help="The url for http submit"
+    ).tag(config=True)
+    
+    http_port = Unicode(
+        "5000",
+        help="The port for http submit"
+    ).tag(config=True)
+    
+    http_submit_path = Unicode(
+        "/srv/nbgrader/http/inbound",
+        help="The submit directory"
     ).tag(config=True)
 
     @default("cache")
@@ -69,6 +99,55 @@ class Exchange(LoggingConfigurable):
             """
         )
     ).tag(config=True)
+    
+    enable_k8s_submit = Bool(
+        False,
+        help="If enabled, the exchange of inbound and outbound is splitted"
+    ).tag(config=True)
+    
+    k8s_root = Unicode(
+        "/srv/nbgrader/exchange",
+        help="Exchange root directory"
+    ).tag(config=True)
+    
+    k8s_inbound = Unicode(
+        "inbound",
+        help="Exchange inbound directory"
+    ).tag(config=True)
+    
+    k8s_outbound = Unicode(
+        "outbound",
+        help="Exchange outbound directory"
+    ).tag(config=True)
+
+    personalized_inbound = Bool(
+        False,
+        help=dedent(
+            "Whether to create submit directory for each JupyterHub user"
+            "This only works with k8s and needs JupyterHub"
+        )
+    ).tag(config=True)
+
+    inbound_dir = Unicode(
+        "inbound",
+        help=dedent(
+            "Which inbound directory to use"
+        )
+    ).tag(config=True)
+    
+    personalized_outbound = Bool(
+        False,
+        help=dedent(
+            "Whether to use a personalized outbound directory per student or not"
+        )
+    ).tag(config=True)
+
+    outbound_dir = Unicode(
+        "outbound",
+        help=dedent(
+            "Which outbound directory to use"
+        )
+    ).tag(config=True)
 
     coursedir = Instance(CourseDirectory, allow_none=True)
     authenticator = Instance(Authenticator, allow_none=True)
@@ -81,6 +160,11 @@ class Exchange(LoggingConfigurable):
         self.ow_perms = (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IWOTH)
         self.orx_perms = (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IXOTH)
         self.orwx_perms = (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH)
+
+        if self.personalized_inbound:
+            self.inbound_dir = "personalized-inbound"
+        if self.personalized_outbound:
+            self.outbound_dir = "personalized-outbound"
 
     def fail(self, msg):
         self.log.fatal(msg)

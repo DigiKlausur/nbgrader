@@ -3,6 +3,7 @@ import random
 import copy
 import nbformat
 import base64
+import pickle
 from . import NbGraderPreprocessor
 
 class Scramble(NbGraderPreprocessor):
@@ -180,7 +181,7 @@ class Scramble(NbGraderPreprocessor):
         }
 
     def obscure(self, my_dict):
-        byte_str = str(my_dict).encode('utf-8')
+        byte_str = pickle.dumps(my_dict)
         obscured = base64.b85encode(byte_str)
         return obscured
     

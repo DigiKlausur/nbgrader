@@ -40,7 +40,7 @@ class ExchangeFetchFeedback(Exchange):
         self.feedback_files = []
         submissions = [os.path.split(x)[-1] for x in glob.glob(pattern)]
         for submission in submissions:
-            _, assignment_id, timestamp = submission.split('/')[-1].split('+')
+            _,assignment_id, timestamp, _ = submission.split('/')[-1].split('+')
             self.log.debug(
                 "Looking for feedback for '{}/{}' submitted at {}".format(
                     self.coursedir.course_id, assignment_id, timestamp))

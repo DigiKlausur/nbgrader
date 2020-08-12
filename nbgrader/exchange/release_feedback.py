@@ -38,6 +38,10 @@ class ExchangeReleaseFeedback(Exchange):
 
         html_files = glob.glob(os.path.join(self.src_path, "*.html"))
         for html_file in html_files:
+            if 'hashcode' in html_file:
+                self.log.debug("Skpping hashcode info")
+                continue
+
             regexp = re.escape(os.path.sep).join([
                 self.coursedir.format_path(
                     self.coursedir.feedback_directory,

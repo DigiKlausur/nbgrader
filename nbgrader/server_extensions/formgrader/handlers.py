@@ -6,7 +6,7 @@ from tornado import web
 
 from .base import BaseHandler, check_xsrf, check_notebook_dir
 from ...api import MissingEntry
-from .gradeexporter import GradeTaskExporter, GradeNotebookExporter
+from .gradeexporter import GradeAssignmentExporter, GradeNotebookExporter, GradeTaskExporter
 
 class ExportGradesHandler(BaseHandler):
     @web.authenticated
@@ -19,24 +19,36 @@ class ExportGradesHandler(BaseHandler):
         self.write(html)
 
 
-class ExportTaskGradesHandler(BaseHandler):
+class ExportAssignmentGradesHandler(BaseHandler):
     @web.authenticated
     @check_xsrf
     def get(self):
-        exporter = GradeTaskExporter(self.gradebook, self.coursedir.root)
+        exporter = GradeAssignmentExporter(self.gradebook)
         self.set_header('Content-Type', 'text/csv; charset="utf-8"')
         self.set_header('Content-Disposition', 'attachment; filename="grades.csv"')    
-        self.write(exporter.make_table().to_csv(index=False))    
+        self.write(exporter.make_table().to_csv(index=False))
+        self.finish() 
 
 
 class ExportNotebookGradesHandler(BaseHandler):
     @web.authenticated
     @check_xsrf
     def get(self):
-        exporter = GradeNotebookExporter(self.gradebook, self.coursedir.root)
+        exporter = GradeNotebookExporter(self.gradebook)
         self.set_header('Content-Type', 'text/csv; charset="utf-8"')
         self.set_header('Content-Disposition', 'attachment; filename="grades.csv"')
         self.write(exporter.make_table().to_csv(index=False))
+        self.finish()
+
+class ExportTaskGradesHandler(BaseHandler):
+    @web.authenticated
+    @check_xsrf
+    def get(self):
+        exporter = GradeTaskExporter(self.gradebook)
+        self.set_header('Content-Type', 'text/csv; charset="utf-8"')
+        self.set_header('Content-Disposition', 'attachment; filename="grades.csv"')
+        self.write(exporter.make_table().to_csv(index=False))
+        self.finish()
 
 
 class ManageAssignmentsHandler(BaseHandler):
@@ -355,8 +367,9 @@ default_handlers = [
     (r"/formgrader/submissions/(.*)", SubmissionFilesHandler),
 
     (r"/formgrader/export_grades/?", ExportGradesHandler),
-    (r"/formgrader/export_grades/tasks/?", ExportTaskGradesHandler),
+    (r"/formgrader/export_grades/assignments/?", ExportAssignmentGradesHandler),
     (r"/formgrader/export_grades/notebooks/?", ExportNotebookGradesHandler),
+    (r"/formgrader/export_grades/tasks/?", ExportTaskGradesHandler),
 
     (r"/formgrader/fonts/(.*)", web.StaticFileHandler, {'path': fonts_path}),
 ]

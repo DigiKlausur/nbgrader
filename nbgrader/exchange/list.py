@@ -29,11 +29,11 @@ class ExchangeList(Exchange):
         student_id = self.coursedir.student_id if self.coursedir.student_id else '*'
 
         if self.inbound:
-            pattern = os.path.join(self.root, course_id, 'inbound', '{}+{}+*'.format(student_id, assignment_id))
+            pattern = os.path.join(self.root, course_id, self.inbound_dir, '{}+{}+*'.format(student_id, assignment_id))
         elif self.cached:
             pattern = os.path.join(self.cache, course_id, '{}+{}+*'.format(student_id, assignment_id))
         else:
-            pattern = os.path.join(self.root, course_id, 'outbound', '{}'.format(assignment_id))
+            pattern = os.path.join(self.root, course_id, self.outbound_dir, '{}'.format(assignment_id))
 
         self.assignments = sorted(glob.glob(pattern))
 
@@ -43,7 +43,7 @@ class ExchangeList(Exchange):
         elif self.cached:
             regexp = r".*/(?P<course_id>.*)/(?P<student_id>[^+]*)\+(?P<assignment_id>[^+]*)\+(?P<timestamp>[^+]*)(\+(?P<random_string>.*))?"
         else:
-            regexp = r".*/(?P<course_id>.*)/outbound/(?P<assignment_id>.*)"
+            regexp = r".*/(?P<course_id>.*)/{}/(?P<assignment_id>.*)".format(self.outbound_dir)
 
         m = re.match(regexp, assignment)
         if m is None:
@@ -237,8 +237,8 @@ class ExchangeList(Exchange):
                 self.log.info(self.format_outbound_assignment(info))
         
         #make outbound dir read- and write- able, todo: FIXME, use the path defined in config
-        outbound_dir = os.path.join(self.root, self.coursedir.course_id, 'inbound')
-        os.chmod(outbound_dir, self.orx_perms)
+        outbound_dir = os.path.join(self.root, self.coursedir.course_id, self.inbound_dir)
+        #os.chmod(outbound_dir, self.orx_perms)
         
         for assignment in self.assignments:
             # make assignment dir readable and writable
@@ -246,7 +246,7 @@ class ExchangeList(Exchange):
             shutil.rmtree(assignment)
 
         #make outbound_dir readable again        
-        os.chmod(outbound_dir, self.orx_perms)
+        #os.chmod(outbound_dir, self.orx_perms)
 
         return assignments
 

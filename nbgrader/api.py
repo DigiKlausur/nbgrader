@@ -19,15 +19,17 @@ from sqlalchemy import select, func, exists, case, literal_column, union_all
 from sqlalchemy.ext.declarative import declared_attr
 from uuid import uuid4
 from .dbutil import _temp_alembic_ini
+from typing import List, Any, Optional, Union
+from .auth import Authenticator
 
 Base = declarative_base()
 
 
-def new_uuid():
+def new_uuid() -> str:
     return uuid4().hex
 
 
-def get_alembic_version():
+def get_alembic_version() -> str:
     with _temp_alembic_ini('sqlite:////tmp/gradebook.db') as alembic_ini:
         output = sp.check_output(['alembic', '-c', alembic_ini, 'heads'])
         head = output.decode().split("\n")[0].split(" ")[0]
@@ -40,6 +42,7 @@ class InvalidEntry(ValueError):
 
 class MissingEntry(ValueError):
     pass
+
 
 class Assignment(Base):
     """Database representation of the master/source version of an assignment."""
@@ -221,7 +224,7 @@ class BaseCell(Base):
             return self.grade_notebook
 
     @notebook.setter
-    def notebook(self, value):
+    def notebook(self, value: Notebook):
         if hasattr(self, 'task_notebook'):
             self.task_notebook = value
         elif hasattr(self, 'solution_notebook'):
@@ -574,7 +577,7 @@ class SubmittedAssignment(Base):
     late_submission_penalty = None
 
     @property
-    def duedate(self):
+    def duedate(self) -> datetime.datetime:
         """The duedate of this student's assignment, which includes any extension
         given, if applicable, and which is just the regular assignment duedate
         otherwise.
@@ -587,7 +590,7 @@ class SubmittedAssignment(Base):
             return orig_duedate
 
     @property
-    def total_seconds_late(self):
+    def total_seconds_late(self) -> float:
         """The number of seconds that this assignment was turned in past the
         duedate (including extensions, if any). If the assignment was turned in
         before the deadline, this value will just be zero.
@@ -622,7 +625,7 @@ class SubmittedAssignment(Base):
             "needs_manual_grade": self.needs_manual_grade
         }
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "SubmittedAssignment<{} for {}>".format(self.name, self.student.id)
 
 
@@ -842,6 +845,7 @@ class Grade(Base):
             return self.max_score_taskcell
         else:
             return self.max_score_gradecell
+
     #: Whether the autograded score is a result of failed autograder tests. This
     #: is True if the autograder score is zero and the cell type is "code", and
     #: otherwise False.
@@ -889,7 +893,7 @@ class Comment(Base):
     name_solutioncell = association_proxy('commented_SolutionCell', 'name')
 
     @property
-    def name(self):
+    def name(self) -> str:
         if self.commented_TaskCell:
             return self.name_taskcell
         else:
@@ -1325,17 +1329,20 @@ class Gradebook(object):
 
     """
 
-    def __init__(self, db_url, course_id="default_course", authenticator=None):
+    def __init__(self,
+                 db_url: str,
+                 course_id: str = "default_course",
+                 authenticator: Optional[Authenticator] = None):
         """Initialize the connection to the database.
 
         Parameters
         ----------
-        db_url : string
+        db_url:
             The URL to the database, e.g. ``sqlite:///grades.db``
-        course_id : string, optional
+        course_id:
             identifier of the course necessary for supporting multiple classes
             default course_id is '' to be consistent with :class:~`nbgrader.apps.api.NbGraderAPI`
-        authenticator : :class:~`nbgrader.auth.BaseAuthenticator`
+        authenticator:
             An authenticator instance for communicating with an external
             database.
 
@@ -1359,10 +1366,10 @@ class Gradebook(object):
         self.course_id = course_id
         self.authenticator = authenticator
 
-    def __enter__(self):
+    def __enter__(self) -> 'Gradebook':
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type: Optional[Any], exc_value: Optional[Any], traceback: Optional[Any]) -> None:
         self.close()
 
     def close(self):
@@ -1377,7 +1384,7 @@ class Gradebook(object):
         self.db.remove()
         self.engine.dispose()
 
-    def check_course(self, course_id="default_course", **kwargs):
+    def check_course(self, course_id: str = "default_course", **kwargs: dict) -> Course:
         """Set the course id
 
         Parameters
@@ -1413,25 +1420,25 @@ class Gradebook(object):
     #### Students
 
     @property
-    def students(self):
+    def students(self) -> List[Student]:
         """A list of all students in the database."""
         return self.db.query(Student)\
             .order_by(Student.last_name, Student.first_name)\
             .all()
 
-    def add_student(self, student_id, **kwargs):
+    def add_student(self, student_id: str, **kwargs: dict) -> Student:
         """Add a new student to the database.
 
         Parameters
         ----------
-        student_id : string
+        student_id:
             The unique id of the student
-        `**kwargs` : dict
+        `**kwargs`:
             other keyword arguments to the :class:`~nbgrader.api.Student` object
 
         Returns
         -------
-        student : :class:`~nbgrader.api.Student`
+        student
 
         """
         if self.authenticator:
@@ -1447,17 +1454,17 @@ class Gradebook(object):
 
         return student
 
-    def find_student(self, student_id):
+    def find_student(self, student_id: str) -> Student:
         """Find a student.
 
         Parameters
         ----------
-        student_id : string
+        student_id:
             The unique id of the student
 
         Returns
         -------
-        student : :class:`~nbgrader.api.Student`
+        student
 
         """
 
@@ -1470,19 +1477,19 @@ class Gradebook(object):
 
         return student
 
-    def update_or_create_student(self, student_id, **kwargs):
+    def update_or_create_student(self, student_id: str, **kwargs: dict) -> Student:
         """Update an existing student, or create it if it doesn't exist.
 
         Parameters
         ----------
-        student_id : string
+        student_id:
             The unique id of the student
         `**kwargs`
             additional keyword arguments for the :class:`~nbgrader.api.Student` object
 
         Returns
         -------
-        student : :class:`~nbgrader.api.Student`
+        student
 
         """
 
@@ -1537,25 +1544,25 @@ class Gradebook(object):
     # Assignments
 
     @property
-    def assignments(self):
+    def assignments(self) -> List[Assignment]:
         """A list of all assignments in the gradebook."""
         return self.db.query(Assignment)\
             .order_by(Assignment.duedate, Assignment.name)\
             .all()
 
-    def add_assignment(self, name, **kwargs):
+    def add_assignment(self, name: str, **kwargs: dict) -> Assignment:
         """Add a new assignment to the gradebook.
 
         Parameters
         ----------
-        name : string
+        name:
             the unique name of the new assignment
         `**kwargs`
             additional keyword arguments for the :class:`~nbgrader.api.Assignment` object
 
         Returns
         -------
-        assignment : :class:`~nbgrader.api.Assignment`
+        assignment
 
         """
         if 'duedate' in kwargs:
@@ -1571,17 +1578,17 @@ class Gradebook(object):
             raise InvalidEntry(*e.args)
         return assignment
 
-    def find_assignment(self, name):
+    def find_assignment(self, name: str) -> Assignment:
         """Find an assignment in the gradebook.
 
         Parameters
         ----------
-        name : string
+        name:
             the unique name of the assignment
 
         Returns
         -------
-        assignment : :class:`~nbgrader.api.Assignment`
+        assignment
 
         """
 
@@ -1594,19 +1601,19 @@ class Gradebook(object):
 
         return assignment
 
-    def update_or_create_assignment(self, name, **kwargs):
+    def update_or_create_assignment(self, name: str, **kwargs: dict) -> Assignment:
         """Update an existing assignment, or create it if it doesn't exist.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the assignment
         `**kwargs`
             additional keyword arguments for the :class:`~nbgrader.api.Assignment` object
 
         Returns
         -------
-        assignment : :class:`~nbgrader.api.Assignment`
+        assignment
 
         """
 
@@ -1656,21 +1663,21 @@ class Gradebook(object):
 
     # Notebooks
 
-    def add_notebook(self, name, assignment, **kwargs):
+    def add_notebook(self, name: str, assignment: str, **kwargs: dict) -> Notebook:
         """Add a new notebook to an assignment.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the new notebook
-        assignment : string
+        assignment:
             the name of an existing assignment
         `**kwargs`
             additional keyword arguments for the :class:`~nbgrader.api.Notebook` object
 
         Returns
         -------
-        notebook : :class:`~nbgrader.api.Notebook`
+        notebook
 
         """
 
@@ -1684,19 +1691,19 @@ class Gradebook(object):
             raise InvalidEntry(*e.args)
         return notebook
 
-    def find_notebook(self, name, assignment):
+    def find_notebook(self, name: str, assignment: str) -> Notebook:
         """Find a particular notebook in an assignment.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the notebook
-        assignment : string
+        assignment:
             the name of the assignment
 
         Returns
         -------
-        notebook : :class:`~nbgrader.api.Notebook`
+        notebook
 
         """
 
@@ -1778,24 +1785,24 @@ class Gradebook(object):
 
     # Grade cells
 
-    def add_grade_cell(self, name, notebook, assignment, **kwargs):
+    def add_grade_cell(self, name: str, notebook: str, assignment: str, **kwargs: dict) -> GradeCell:
         """Add a new grade cell to an existing notebook of an existing
         assignment.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the new grade cell
-        notebook : string
+        notebook:
             the name of an existing notebook
-        assignment : string
+        assignment:
             the name of an existing assignment
         `**kwargs`
             additional keyword arguments for :class:`~nbgrader.api.GradeCell`
 
         Returns
         -------
-        grade_cell : :class:`~nbgrader.api.GradeCell`
+        grade_cell
 
         """
 
@@ -1809,21 +1816,21 @@ class Gradebook(object):
             raise InvalidEntry(*e.args)
         return grade_cell
 
-    def find_grade_cell(self, name, notebook, assignment):
+    def find_grade_cell(self, name: str, notebook: str, assignment: str) -> GradeCell:
         """Find a grade cell in a particular notebook of an assignment.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the grade cell
-        notebook : string
+        notebook:
             the name of the notebook
-        assignment : string
+        assignment:
             the name of the assignment
 
         Returns
         -------
-        grade_cell : :class:`~nbgrader.api.GradeCell`
+        grade_cell
 
         """
 
@@ -1841,21 +1848,21 @@ class Gradebook(object):
 
         return grade_cell
 
-    def find_graded_cell(self, name, notebook, assignment):
+    def find_graded_cell(self, name: str, notebook: str, assignment: str) -> Union[GradeCell, TaskCell]:
         """Find a graded cell in a particular notebook of an assignment. This can be either a GradeCell or a TaskCell
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the grade cell
-        notebook : string
+        notebook:
             the name of the notebook
-        assignment : string
+        assignment:
             the name of the assignment
 
         Returns
         -------
-        grade_cell : :class:`~nbgrader.api.GradeCell` or :class:`~nbgrader.api.TaskCell`
+        grade_cell
 
         """
 
@@ -1883,24 +1890,24 @@ class Gradebook(object):
 
         return grade_cell
 
-    def update_or_create_grade_cell(self, name, notebook, assignment, **kwargs):
+    def update_or_create_grade_cell(self, name: str, notebook: str, assignment: str, **kwargs: dict) -> GradeCell:
         """Update an existing grade cell in a notebook of an assignment, or
         create the grade cell if it does not exist.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the grade cell
-        notebook : string
+        notebook:
             the name of the notebook
-        assignment : string
+        assignment:
             the name of the assignment
         `**kwargs`
             additional keyword arguments for :class:`~nbgrader.api.GradeCell`
 
         Returns
         -------
-        grade_cell : :class:`~nbgrader.api.GradeCell`
+        grade_cell
 
         """
 
@@ -1921,17 +1928,17 @@ class Gradebook(object):
 
     # Solution cells
 
-    def add_solution_cell(self, name, notebook, assignment, **kwargs):
+    def add_solution_cell(self, name: str, notebook: str, assignment: str, **kwargs: dict) -> SolutionCell:
         """Add a new solution cell to an existing notebook of an existing
         assignment.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the new solution cell
-        notebook : string
+        notebook:
             the name of an existing notebook
-        assignment : string
+        assignment:
             the name of an existing assignment
         `**kwargs`
             additional keyword arguments for :class:`~nbgrader.api.SolutionCell`
@@ -1952,7 +1959,7 @@ class Gradebook(object):
             raise InvalidEntry(*e.args)
         return solution_cell
 
-    def find_solution_cell(self, name, notebook, assignment):
+    def find_solution_cell(self, name: str, notebook: str, assignment: str) -> SolutionCell:
         """Find a solution cell in a particular notebook of an assignment.
 
         Parameters
@@ -1981,24 +1988,29 @@ class Gradebook(object):
 
         return solution_cell
 
-    def update_or_create_solution_cell(self, name, notebook, assignment, **kwargs):
+    def update_or_create_solution_cell(self,
+                                       name: str,
+                                       notebook: str,
+                                       assignment: str,
+                                       **kwargs: dict
+                                       ) -> SolutionCell:
         """Update an existing solution cell in a notebook of an assignment, or
         create the solution cell if it does not exist.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the solution cell
-        notebook : string
+        notebook:
             the name of the notebook
-        assignment : string
+        assignment:
             the name of the assignment
         `**kwargs`
             additional keyword arguments for :class:`~nbgrader.api.SolutionCell`
 
         Returns
         -------
-        solution_cell : :class:`~nbgrader.api.SolutionCell`
+        solution_cell
 
         """
 
@@ -2018,24 +2030,24 @@ class Gradebook(object):
 
 # Task cells
 
-    def add_task_cell(self, name, notebook, assignment, **kwargs):
+    def add_task_cell(self, name: str, notebook: str, assignment: str, **kwargs: dict) -> TaskCell:
         """Add a new task cell to an existing notebook of an existing
         assignment.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the new solution cell
-        notebook : string
+        notebook:
             the name of an existing notebook
-        assignment : string
+        assignment:
             the name of an existing assignment
         `**kwargs`
             additional keyword arguments for :class:`~nbgrader.api.TaskCell`
 
         Returns
         -------
-        solution_cell : :class:`~nbgrader.api.TaskCell`
+        solution_cell
 
         """
 
@@ -2115,7 +2127,7 @@ class Gradebook(object):
 
     # Source cells
 
-    def add_source_cell(self, name, notebook, assignment, **kwargs):
+    def add_source_cell(self, name: str, notebook: str, assignment: str, **kwargs: dict) -> SourceCell:
         """Add a new source cell to an existing notebook of an existing
         assignment.
 
@@ -2146,16 +2158,16 @@ class Gradebook(object):
             raise InvalidEntry(*e.args)
         return source_cell
 
-    def find_source_cell(self, name, notebook, assignment):
+    def find_source_cell(self, name: str, notebook: str, assignment: str) -> SourceCell:
         """Find a source cell in a particular notebook of an assignment.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the source cell
-        notebook : string
+        notebook:
             the name of the notebook
-        assignment : string
+        assignment:
             the name of the assignment
 
         Returns
@@ -2175,24 +2187,24 @@ class Gradebook(object):
 
         return source_cell
 
-    def update_or_create_source_cell(self, name, notebook, assignment, **kwargs):
+    def update_or_create_source_cell(self, name: str, notebook: str, assignment: str, **kwargs: dict) -> SourceCell:
         """Update an existing source cell in a notebook of an assignment, or
         create the source cell if it does not exist.
 
         Parameters
         ----------
-        name : string
+        name:
             the name of the source cell
-        notebook : string
+        notebook:
             the name of the notebook
-        assignment : string
+        assignment:
             the name of the assignment
         `**kwargs`
             additional keyword arguments for :class:`~nbgrader.api.SourceCell`
 
         Returns
         -------
-        source_cell : :class:`~nbgrader.api.SourceCell`
+        source_cell
 
         """
 
@@ -2212,7 +2224,7 @@ class Gradebook(object):
 
     # Submissions
 
-    def add_submission(self, assignment, student, **kwargs):
+    def add_submission(self, assignment: str, student: str, **kwargs: dict) -> SubmittedAssignment:
         """Add a new submission of an assignment by a student.
 
         This method not only creates the high-level submission object, but also
@@ -2222,16 +2234,16 @@ class Gradebook(object):
 
         Parameters
         ----------
-        assignment : string
+        assignment:
             the name of an existing assignment
-        student : string
+        student:
             the name of an existing student
         `**kwargs`
             additional keyword arguments for :class:`~nbgrader.api.SubmittedAssignment`
 
         Returns
         -------
-        submission : :class:`~nbgrader.api.SubmittedAssignment`
+        submission
 
         """
 
@@ -2266,7 +2278,7 @@ class Gradebook(object):
 
         return submission
 
-    def find_submission(self, assignment, student):
+    def find_submission(self, assignment: str, student: str) -> SubmittedAssignment:
         """Find a student's submission for a given assignment.
 
         Parameters
@@ -2294,7 +2306,7 @@ class Gradebook(object):
 
         return submission
 
-    def update_or_create_submission(self, assignment, student, **kwargs):
+    def update_or_create_submission(self, assignment: str, student: str, **kwargs: dict) -> SubmittedAssignment:
         """Update an existing submission of an assignment by a given student,
         or create a new submission if it doesn't exist.
 
@@ -2303,16 +2315,16 @@ class Gradebook(object):
 
         Parameters
         ----------
-        assignment : string
+        assignment:
             the name of an existing assignment
-        student : string
+        student:
             the name of an existing student
         `**kwargs`
             additional keyword arguments for :class:`~nbgrader.api.SubmittedAssignment`
 
         Returns
         -------
-        submission : :class:`~nbgrader.api.SubmittedAssignment`
+        submission
 
         """
 
@@ -2489,22 +2501,22 @@ class Gradebook(object):
             .filter(Student.id == student)\
             .all()
 
-    def find_submission_notebook(self, notebook, assignment, student):
+    def find_submission_notebook(self, notebook: str, assignment: str, student: str) -> SubmittedNotebook:
         """Find a particular notebook in a student's submission for a given
         assignment.
 
         Parameters
         ----------
-        notebook : string
+        notebook:
             the name of a notebook
-        assignment : string
+        assignment:
             the name of an assignment
-        student : string
+        student:
             the unique id of a student
 
         Returns
         -------
-        notebook : :class:`~nbgrader.api.SubmittedNotebook`
+        notebook
 
         """
 
@@ -2548,24 +2560,24 @@ class Gradebook(object):
 
         return notebook
 
-    def find_grade(self, grade_cell, notebook, assignment, student):
+    def find_grade(self, grade_cell: str, notebook: str, assignment: str, student: str) -> Grade:
         """Find a particular grade in a notebook in a student's submission
         for a given assignment.
 
         Parameters
         ----------
-        grade_cell : string
+        grade_cell:
             the name of a grade or task cell
-        notebook : string
+        notebook:
             the name of a notebook
-        assignment : string
+        assignment:
             the name of an assignment
-        student : string
+        student:
             the unique id of a student
 
         Returns
         -------
-        grade : :class:`~nbgrader.api.Grade`
+        grade
 
         """
         try:
@@ -2624,24 +2636,24 @@ class Gradebook(object):
 
         return grade
 
-    def find_comment(self, solution_cell, notebook, assignment, student):
+    def find_comment(self, solution_cell: str, notebook: str, assignment: str, student: str) -> Comment:
         """Find a particular comment in a notebook in a student's submission
         for a given assignment.
 
         Parameters
         ----------
-        solution_cell : string
+        solution_cell:
             the name of a solution or task cell
-        notebook : string
+        notebook:
             the name of a notebook
-        assignment : string
+        assignment:
             the name of an assignment
-        student : string
+        student:
             the unique id of a student
 
         Returns
         -------
-        comment : :class:`~nbgrader.api.Comment`
+        comment
 
         """
 
@@ -2816,19 +2828,19 @@ class Gradebook(object):
                 TaskCell.cell_type == "markdown")).scalar()
         return score_sum / assignment.num_submissions
 
-    def average_notebook_score(self, notebook_id, assignment_id):
+    def average_notebook_score(self, notebook_id: str, assignment_id: str) -> float:
         """Compute the average score for a particular notebook in an assignment.
 
         Parameters
         ----------
-        notebook_id : string
+        notebook_id:
             the name of the notebook
-        assignment_id : string
+        assignment_id:
             the name of the assignment
 
         Returns
         -------
-        score : float
+        score:
             The average notebook score
 
         """
@@ -2844,20 +2856,20 @@ class Gradebook(object):
                 Assignment.name == assignment_id)).scalar()
         return score_sum / notebook.num_submissions
 
-    def average_notebook_code_score(self, notebook_id, assignment_id):
+    def average_notebook_code_score(self, notebook_id: str, assignment_id: str) -> float:
         """Compute the average code score for a particular notebook in an
         assignment.
 
         Parameters
         ----------
-        notebook_id : string
+        notebook_id:
             the name of the notebook
-        assignment_id : string
+        assignment_id:
             the name of the assignment
 
         Returns
         -------
-        score : float
+        score:
             The average notebook code score
 
         """
@@ -2877,20 +2889,20 @@ class Gradebook(object):
                 GradeCell.cell_type == "code")).scalar()
         return score_sum / notebook.num_submissions
 
-    def average_notebook_written_score(self, notebook_id, assignment_id):
+    def average_notebook_written_score(self, notebook_id: str, assignment_id: str) -> float:
         """Compute the average written score for a particular notebook in an
         assignment.
 
         Parameters
         ----------
-        notebook_id : string
+        notebook_id:
             the name of the notebook
-        assignment_id : string
+        assignment_id:
             the name of the assignment
 
         Returns
         -------
-        score : float
+        score:
             The average notebook written score
 
         """
@@ -2910,20 +2922,20 @@ class Gradebook(object):
                 GradeCell.cell_type == "markdown")).scalar()
         return score_sum / notebook.num_submissions
 
-    def average_notebook_task_score(self, notebook_id, assignment_id):
+    def average_notebook_task_score(self, notebook_id: str, assignment_id: str) -> float:
         """Compute the average task score for a particular notebook in an
         assignment.
 
         Parameters
         ----------
-        notebook_id : string
+        notebook_id:
             the name of the notebook
-        assignment_id : string
+        assignment_id:
             the name of the assignment
 
         Returns
         -------
-        score : float
+        score:
             The average notebook task score
 
         """
@@ -2955,7 +2967,13 @@ class Gradebook(object):
             A list of dictionaries, one per student
 
         """
-        total_score, = self.db.query(Assignment.max_score).one()
+        max_scores = self.db.query(
+            Assignment.id,
+            func.sum(Assignment.max_score).label("max_score")
+        ).group_by(Assignment.id).subquery()
+        _max_scores = func.coalesce(max_scores.c.max_score, 0.0)
+        total_score, = self.db.query(func.sum(_max_scores)).one()
+
         if len(self.assignments) > 0 and total_score > 0:
             # subquery the scores
             scores = self.db.query(

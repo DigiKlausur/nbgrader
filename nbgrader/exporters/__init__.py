@@ -23,7 +23,8 @@ class FormExporter(HTMLExporter):
         cell = context.get('cell', {})
         metadata = context.get('cell', {}).metadata
         soup = BeautifulSoup(source, 'html.parser')
-        if not soup.ul:
+        my_type = None
+        if not soup.ul or not utils.is_extra_cell(cell):
             return soup.prettify().replace('\n', '')
         if utils.is_singlechoice(cell):
             my_type = 'radio'

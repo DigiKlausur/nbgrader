@@ -1,6 +1,6 @@
 import re
 import base64
-import ast
+import pickle
 from . import NbGraderPreprocessor
 
 class Unscramble(NbGraderPreprocessor):
@@ -14,14 +14,13 @@ class Unscramble(NbGraderPreprocessor):
             return nb, resources
 
         byte_config = nb.metadata.scramble_config.config
-        unobscured = base64.b85decode(byte_config)
-        config = ast.literal_eval(unobscured.decode('utf-8'))
+        config = pickle.loads(base64.b85decode(byte_config))
 
         for cell in nb.cells:
             matches = self.__pattern.findall(cell.source)
             for m in matches:
                 if m.strip() in config:
-                    cell.source = cell.source.replace('{{' + m + '}}', config[m.strip()])
+                    cell.source = cell.source.replace('{{' + m + '}}', str(config[m.strip()]))
 
         nb.cells = nb.cells[1:]
         return nb, resources

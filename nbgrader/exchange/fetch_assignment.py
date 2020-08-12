@@ -36,12 +36,14 @@ class ExchangeFetchAssignment(Exchange):
             self.fail("You do not have access to this course.")
 
         self.course_path = os.path.join(self.root, self.coursedir.course_id)
-        self.outbound_path = os.path.join(self.course_path, 'outbound')
+        self.outbound_path = os.path.join(self.course_path, self.outbound_dir)
+
         self.src_path = os.path.join(self.outbound_path, self.coursedir.assignment_id)
         if not os.path.isdir(self.src_path):
             self._assignment_not_found(
                 self.src_path,
                 os.path.join(self.outbound_path, "*"))
+
         if not check_mode(self.src_path, read=True, execute=True):
             self.fail("You don't have read permissions for the directory: {}".format(self.src_path))
         # Add user to src path in order to fetch personalized assignment
@@ -80,6 +82,13 @@ class ExchangeFetchAssignment(Exchange):
 
     def do_copy(self, src, dest):
         """Copy the src dir to the dest dir omitting the self.coursedir.ignore globs."""
+        # Check if there is a version for the student
+        if self.personalized_outbound:
+            if os.path.exists(os.path.join(src, os.getenv('JUPYTERHUB_USER'))):
+                src = os.path.join(src, os.getenv('JUPYTERHUB_USER'))
+            else:
+                self.log.warning('Using personalized outbound, but no directory for user {} exists'.format(os.getenv('JUPYTERHUB_USER')))
+            
         if os.path.isdir(self.dest_path):
             self.copy_if_missing(src, dest, ignore=shutil.ignore_patterns(*self.coursedir.ignore))
         else:

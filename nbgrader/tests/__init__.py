@@ -7,7 +7,7 @@ import logging
 import warnings
 import socket
 
-from six import StringIO
+from io import StringIO
 from nbformat.v4 import new_code_cell, new_markdown_cell
 from jupyter_core.application import NoStart
 from nbconvert.filters import strip_ansi
@@ -16,6 +16,7 @@ from ..utils import compute_checksum
 from ..apps.nbgraderapp import NbGraderApp
 from ..validator import Validator
 from ..nbgraderformat import SCHEMA_VERSION
+from typing import List, Optional
 
 
 def create_code_cell():
@@ -30,6 +31,26 @@ print("hello")
 def create_text_cell():
     source = "this is the answer!\n"
     cell = new_markdown_cell(source=source)
+    return cell
+
+
+def create_regular_cell(source, cell_type, schema_version=SCHEMA_VERSION):
+    if cell_type == "markdown":
+        cell = new_markdown_cell(source=source)
+    elif cell_type == "code":
+        cell = new_code_cell(source=source)
+    else:
+        raise ValueError("invalid cell type: {}".format(cell_type))
+
+    cell.metadata.nbgrader = {}
+    cell.metadata.nbgrader["grade"] = False
+    cell.metadata.nbgrader["grade_id"] = ""
+    cell.metadata.nbgrader["points"] = 0.0
+    cell.metadata.nbgrader["solution"] = False
+    cell.metadata.nbgrader["task"] = False
+    cell.metadata.nbgrader["locked"] = False
+    cell.metadata.nbgrader["schema_version"] = schema_version
+
     return cell
 
 
@@ -114,6 +135,8 @@ def create_grade_and_solution_cell(source, cell_type, grade_id, points, schema_v
 def create_task_cell(source, cell_type, grade_id, points, schema_version=SCHEMA_VERSION):
     if cell_type == "markdown":
         cell = new_markdown_cell(source=source)
+    elif cell_type == "code":
+        cell = new_code_cell(source=source)
     else:
         raise ValueError("invalid cell type: {}".format(cell_type))
 
@@ -162,7 +185,7 @@ def run_command(command, retcode=0, coverage=True, **kwargs):
     return output
 
 
-def run_nbgrader(args, retcode=0, env=None, stdout=False):
+def run_nbgrader(args: List[str], retcode: int = 0, env: Optional[dict] = None, stdout: bool = False) -> str:
     # store os.environ
     old_env = os.environ.copy()
     if env:
