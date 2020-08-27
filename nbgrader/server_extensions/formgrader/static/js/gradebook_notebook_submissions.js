@@ -180,6 +180,15 @@ var loadSubmittedNotebooks = function () {
                 });
                 views.push(view);
             });
+            if (view === 'task') {
+                // Hide unused columns
+                $('th:nth-child(4)').hide();
+                $('th:nth-child(5)').hide();
+                $('th:nth-child(6)').hide();
+                $('td:nth-child(4)').hide();
+                $('td:nth-child(5)').hide();
+                $('td:nth-child(6)').hide();
+            }
             insertDataTable(tbl.parent());
             $('span.glyphicon.name-hidden').tooltip({title: "Show student name"});
             $('span.glyphicon.name-shown').tooltip({title: "Hide student name"});
