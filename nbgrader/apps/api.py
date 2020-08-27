@@ -712,6 +712,11 @@ class NbGraderAPI(LoggingConfigurable):
         """
         with self.gradebook as gb:
             notebook_uid = gb.find_notebook(notebook_id, assignment_id).id
+            manual = gb.db.query(BaseCell.id)\
+                    .filter(BaseCell.notebook_id == notebook_uid)\
+                    .filter(BaseCell.type == 'GradeCell')\
+                    .filter(BaseCell.name == task_id)\
+                    .first()
             grade_ids = gb.db.query(BaseCell.id)\
                       .filter(BaseCell.notebook_id == notebook_uid)\
                       .filter(BaseCell.type == 'GradeCell')\
@@ -739,14 +744,14 @@ class NbGraderAPI(LoggingConfigurable):
                         .filter(GradeCell.id == grade_id[0])\
                         .first()
                     submission['max_score'] += max_score
-                    if grade.manual_score:
+                    if grade.manual_score is not None:
                         submission['score'] += grade.manual_score
-                    elif grade.auto_score:
+                    elif grade.auto_score is not None:
                         submission['score'] += grade.auto_score
+                        if grade.auto_score < max_score and not manual:
+                            submission['failed_tests'] = 1
                     submission['needs_manual_grade'] = max(submission['needs_manual_grade'], \
                                                            grade.needs_manual_grade)
-                submission['failed_tests'] = 1 if submission['score'] < submission['max_score'] \
-                                             else 0
                     
                 submissions.append(submission)
                 
