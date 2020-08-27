@@ -652,7 +652,12 @@ class NbGraderAPI(LoggingConfigurable):
                               .all()
                 if len(grade_ids) < 1:
                     continue
-                if len(grade_ids) > 1:
+
+                if not gb.db.query(BaseCell.id)\
+                         .filter(BaseCell.type == 'GradeCell')\
+                         .filter(BaseCell.notebook_id == notebook_id)\
+                         .filter(BaseCell.name == cell_name[0])\
+                         .first():
                     solution_cell['autograded'] = 1
                     
                 for grade_id in grade_ids:
