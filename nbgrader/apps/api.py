@@ -631,70 +631,56 @@ class NbGraderAPI(LoggingConfigurable):
         """
         solution_cells = []
         with self.gradebook as gb:
+            num_submissions = len(gb.notebook_submissions(notebook_id, assignment_id))
             notebook_id = gb.find_notebook(notebook_id, assignment_id).id
-                        
-            for cell_id, cell_name in gb.db.query(BaseCell.id, BaseCell.name)\
-                                        .filter(BaseCell.type == 'SolutionCell')\
-                                        .filter(BaseCell.notebook_id == notebook_id):
-
-                autograded = 0
-
-                grade_id = gb.db.query(BaseCell.id)\
-                    .filter(BaseCell.type == 'GradeCell')\
-                    .filter(BaseCell.notebook_id == notebook_id)\
-                    .filter(BaseCell.name == cell_name)\
-                    .first()
-
-                if grade_id == None:
-                    autograded = 1
-                    grade_id = gb.db.query(BaseCell.id)\
-                        .filter(BaseCell.type == 'GradeCell')\
-                        .filter(BaseCell.notebook_id == notebook_id)\
-                        .filter(BaseCell.name == 'test_{}'.format(cell_name))\
-                        .first()
-                if grade_id == None:
+            
+            for cell_name in gb.db.query(BaseCell.name)\
+                                  .filter(BaseCell.type == 'SolutionCell')\
+                                  .filter(BaseCell.notebook_id == notebook_id):
+                
+                solution_cell = {
+                    'name': cell_name[0],
+                    'avg_score': 0,
+                    'max_score': 0,
+                    'needs_manual_grade': 0,
+                    'autograded': 0
+                }
+                grade_ids = gb.db.query(BaseCell.id)\
+                              .filter(BaseCell.type == 'GradeCell')\
+                              .filter(BaseCell.notebook_id == notebook_id)\
+                              .filter(BaseCell.name.contains(cell_name[0]))\
+                              .all()
+                if len(grade_ids) < 1:
                     continue
 
-                grade_cell = gb.db.query(GradeCell.id, GradeCell.max_score)\
-                    .filter(GradeCell.id == grade_id[0])\
-                    .first()
-
-                avg_score = 0
-                needs_grading = 0
-                i = 0
-                for manual_score, auto_score, needs_manual_grade in gb.db\
-                        .query(Grade.manual_score, Grade.auto_score,\
-                        Grade.needs_manual_grade)\
-                        .filter(Grade.cell_id == grade_cell[0]):
-                    needs_grading = max(needs_manual_grade, needs_grading)
-                    if manual_score:
-                        avg_score += manual_score
-                    elif auto_score:
-                        avg_score += auto_score
-                    i += 1
-
-                if needs_grading:
-                    needs_grading = 1
-                else:
-                    needs_grading = 0
+                if not gb.db.query(BaseCell.id)\
+                         .filter(BaseCell.type == 'GradeCell')\
+                         .filter(BaseCell.notebook_id == notebook_id)\
+                         .filter(BaseCell.name == cell_name[0])\
+                         .first():
+                    solution_cell['autograded'] = 1
                     
-                cell_avg_score = 0
-                if i > 0:
-                    cell_avg_score = avg_score/i
-
-                solution_cell = {
-                    "id": cell_id,
-                    "name": cell_name,
-                    "grade_id": grade_cell[0],
-                    "max_score": grade_cell[1],
-                    "autograded": autograded,
-                    "avg_score": cell_avg_score,
-                    "needs_manual_grade": needs_grading
-                }
-
+                for grade_id in grade_ids:
+                    solution_cell['max_score'] += gb.db.query(GradeCell.max_score)\
+                                                        .filter(GradeCell.id == grade_id[0])\
+                                                        .first()[0]
+                    avg_score = 0
+                    submissions = 0
+                    for manual_score, auto_score, needs_manual_grade in gb.db\
+                            .query(Grade.manual_score, Grade.auto_score,\
+                                   Grade.needs_manual_grade)\
+                            .filter(Grade.cell_id == grade_id[0]):
+                        solution_cell['needs_manual_grade'] = max(solution_cell['needs_manual_grade'], \
+                                                                  needs_manual_grade)
+                        if manual_score:
+                            solution_cell['avg_score'] += manual_score
+                        elif auto_score:
+                            solution_cell['avg_score'] += auto_score
+                if num_submissions > 0:
+                    solution_cell['avg_score'] /= num_submissions
+                            
                 solution_cells.append(solution_cell)
-
-        return solution_cells
+            return solution_cells
 
     def get_grade_cell(self, notebook_id, solution_cell_name):
         with self.gradebook as gb:            
@@ -725,47 +711,50 @@ class NbGraderAPI(LoggingConfigurable):
 
         """
         with self.gradebook as gb:
-            try:
-                notebook_uid = gb.find_notebook(notebook_id, assignment_id).id
-                grade_id = self.get_grade_cell(notebook_uid, task_id)[0]
-            except MissingEntry:
-                return []
-            except TypeError:
-                return []
+            notebook_uid = gb.find_notebook(notebook_id, assignment_id).id
+            manual = gb.db.query(BaseCell.id)\
+                    .filter(BaseCell.notebook_id == notebook_uid)\
+                    .filter(BaseCell.type == 'GradeCell')\
+                    .filter(BaseCell.name == task_id)\
+                    .first()
+            grade_ids = gb.db.query(BaseCell.id)\
+                      .filter(BaseCell.notebook_id == notebook_uid)\
+                      .filter(BaseCell.type == 'GradeCell')\
+                      .filter(BaseCell.name.contains(task_id))\
+                      .all()
+        
+            submissions = []
 
-            query = gb.db.query(SubmittedNotebook.id, Grade, Student, GradeCell)\
-                .join(SubmittedAssignment, SubmittedNotebook.assignment_id == SubmittedAssignment.id)\
-                .join(Grade, Grade.notebook_id == SubmittedNotebook.id)\
-                .join(Student, Student.id == SubmittedAssignment.student_id)\
-                .join(GradeCell, GradeCell.id == Grade.cell_id)\
-                .filter(Grade.cell_id == grade_id)\
-                .all()
-
-        submissions = []
-        idx = 0
-        for submission_id, grade, student, grade_cell in query:
-            score = 0
-            tests_failed = False
-            if grade.manual_score != None:
-                score = grade.manual_score
-            elif grade.auto_score != None:
-                score = grade.auto_score
-                tests_failed = score < grade_cell.max_score
-            submission = {
-                "id": submission_id,
-                "student": student.id,
-                "first_name": student.first_name,
-                "last_name": student.last_name,
-                "score": score,
-                "max_score": grade_cell.max_score,
-                "needs_manual_grade": grade.needs_manual_grade,
-                "tests_failed": tests_failed,
-                "index": idx        
-            }
-            submissions.append(submission)
-            idx += 1
-
-
+            for idx, submitted_notebook in enumerate(gb.notebook_submissions(notebook_id, assignment_id)):
+                submission = {
+                    'id': submitted_notebook.id,
+                    'student': submitted_notebook.student.id,
+                    'first_name': submitted_notebook.student.first_name,
+                    'last_name': submitted_notebook.student.last_name,
+                    'score': 0,
+                    'max_score': 0,
+                    'needs_manual_grade': 0,
+                    'failed_tests': 0,
+                    'index': idx
+                }
+                for grade_id in grade_ids:
+                    grade, max_score = gb.db.query(Grade, GradeCell.max_score)\
+                        .filter(Grade.notebook_id == submitted_notebook.id)\
+                        .filter(Grade.cell_id == grade_id[0])\
+                        .filter(GradeCell.id == grade_id[0])\
+                        .first()
+                    submission['max_score'] += max_score
+                    if grade.manual_score is not None:
+                        submission['score'] += grade.manual_score
+                    elif grade.auto_score is not None:
+                        submission['score'] += grade.auto_score
+                        if grade.auto_score < max_score and not manual:
+                            submission['failed_tests'] = 1
+                    submission['needs_manual_grade'] = max(submission['needs_manual_grade'], \
+                                                           grade.needs_manual_grade)
+                    
+                submissions.append(submission)
+                
         return submissions
 
     def _filter_existing_notebooks(self, assignment_id, notebooks):
