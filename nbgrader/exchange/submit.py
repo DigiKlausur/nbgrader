@@ -1,5 +1,6 @@
 import base64
 import os
+import sys
 from stat import (
     S_IRUSR, S_IWUSR, S_IXUSR,
     S_IRGRP, S_IWGRP, S_IXGRP,
@@ -203,6 +204,8 @@ class ExchangeSubmit(Exchange):
     def copy_files(self):
         self.init_release()
 
+        hashcode = ''
+
         # Original notebook file
         student_notebook_file = os.path.join(self.src_path, self.coursedir.assignment_id+".ipynb")
         #check notebook exists
@@ -321,3 +324,22 @@ class ExchangeSubmit(Exchange):
             self.log.info("Submitted as: {} {} {}".format(
                 self.coursedir.course_id, self.coursedir.assignment_id, str(self.timestamp)
             ))
+        return hashcode, self.timestamp
+
+    def start(self):
+        if sys.platform == 'win32':
+            self.fail("Sorry, the exchange is not available on Windows.")
+
+        if not self.coursedir.groupshared:
+            # This just makes sure that directory is o+rwx.  In group shared
+            # case, it is up to admins to ensure that instructors can write
+            # there.
+            self.ensure_root()
+        self.set_timestamp()
+
+        self.init_src()
+        self.init_dest()
+        hashcode, timestamp = self.copy_files()
+        return hashcode, timestamp
+
+
