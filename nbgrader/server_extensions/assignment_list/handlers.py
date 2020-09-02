@@ -252,18 +252,18 @@ class AssignmentList(LoggingConfigurable):
                     coursedir=coursedir,
                     authenticator=authenticator,
                     config=config)
-                submit.start()
+                hashcode, timestamp = submit.start()
+                retvalue = {
+                    "success": True,
+                    "hashcode": hashcode,
+                    "timestamp": timestamp
+                }
 
             except:
                 self.log.error(traceback.format_exc())
                 retvalue = {
                     "success": False,
                     "value": traceback.format_exc()
-                }
-
-            else:
-                retvalue = {
-                    "success": True
                 }
 
         return retvalue
@@ -298,7 +298,10 @@ class AssignmentActionHandler(BaseAssignmentHandler):
             course_id = self.get_argument('course_id')
             output = self.manager.submit_assignment(course_id, assignment_id)
             if output['success']:
-                self.finish(json.dumps(self.manager.list_assignments(course_id=course_id)))
+                response = self.manager.list_assignments(course_id=course_id)
+                response['hashcode'] = output['hashcode']
+                response['timestamp'] = output['timestamp']
+                self.finish(json.dumps(response))
             else:
                 self.finish(json.dumps(output))
         elif action == 'fetch_feedback':
