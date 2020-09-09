@@ -754,6 +754,10 @@ class NbGraderAPI(LoggingConfigurable):
                                                            grade.needs_manual_grade)
                     
                 submissions.append(submission)
+
+        submissions.sort(key=lambda x: x['id'])
+        for idx, submission in enumerate(submissions):
+            submission['index'] = idx
                 
         return submissions
 
