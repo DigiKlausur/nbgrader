@@ -203,12 +203,12 @@ span.nbgrader-label {
 <div class="cell border-box-sizing text_cell rendered">
   {{ self.empty_in_prompt() }}
 
-  {%- if 'nbgrader' in cell.metadata and (cell.metadata.nbgrader.solution or cell.metadata.nbgrader.grade or cell.metadata.nbgrader.task ) -%}
+  {%- if 'nbgrader' in cell.metadata and (cell.metadata.nbgrader.solution or cell.metadata.nbgrader.grade or cell.metadata.nbgrader.task) -%}
   <div class="panel panel-primary nbgrader_cell">
     {{ nbgrader_heading(cell) }}
     <div class="panel-body">
       <div class="text_cell_render border-box-sizing rendered_html">
-        {{ cell.source  | markdown2html | strip_files_prefix | to_choicecell }}
+        {{ cell.source  | markdown2html | strip_files_prefix }}
       </div>
     </div>
     {{ nbgrader_footer(cell) }}

@@ -2,7 +2,7 @@
 
 import os
 
-from ...exporters import FormExporter
+from nbconvert.exporters import HTMLExporter
 from traitlets import default
 from tornado import web
 from jinja2 import Environment, FileSystemLoader
@@ -10,7 +10,6 @@ from notebook.utils import url_path_join as ujoin
 
 from . import handlers, apihandlers
 from ...apps.baseapp import NbGrader
-from ...preprocessors import FilterCellsById
 
 
 class FormgradeExtension(NbGrader):
@@ -21,15 +20,13 @@ class FormgradeExtension(NbGrader):
     @default("classes")
     def _classes_default(self):
         classes = super(FormgradeExtension, self)._classes_default()
-        classes.append(FormExporter)
+        classes.append(HTMLExporter)
         return classes
 
     def build_extra_config(self):
         extra_config = super(FormgradeExtension, self).build_extra_config()
-        extra_config.FormExporter.template_file = 'formgrade'
-        extra_config.FormExporter.template_path = [handlers.template_path]
-        extra_config.FormExporter.preprocessors = [FilterCellsById]
-
+        extra_config.HTMLExporter.template_file = 'formgrade'
+        extra_config.HTMLExporter.template_path = [handlers.template_path]
         return extra_config
 
     def init_tornado_settings(self, webapp):
@@ -54,7 +51,7 @@ class FormgradeExtension(NbGrader):
             nbgrader_url_prefix=os.path.relpath(self.coursedir.root, self.parent.notebook_dir),
             nbgrader_coursedir=self.coursedir,
             nbgrader_authenticator=self.authenticator,
-            nbgrader_exporter=FormExporter(config=self.config),
+            nbgrader_exporter=HTMLExporter(config=self.config),
             nbgrader_gradebook=None,
             nbgrader_db_url=self.coursedir.db_url,
             nbgrader_jinja2_env=jinja_env,

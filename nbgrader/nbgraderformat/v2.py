@@ -1,19 +1,20 @@
 from nbformat import read as _read, reads as _reads
 from nbformat import write as _write, writes as _writes
+from nbformat.notebooknode import NotebookNode
+import typing
 from .v1 import MetadataValidatorV1
 from .common import BaseMetadataValidator, ValidationError
-from ..utils import is_grade, is_solution, is_locked
 
 
 class MetadataValidatorV2(BaseMetadataValidator):
 
-    schema = None
+    schema_version = 2
 
-    def __init__(self):
-        super(MetadataValidatorV2, self).__init__(2)
+    def __init__(self) -> None:
+        super().__init__()
         self.v1 = MetadataValidatorV1()
 
-    def _upgrade_v1_to_v2(self, cell):
+    def _upgrade_v1_to_v2(self, cell: NotebookNode) -> NotebookNode:
         meta = cell.metadata['nbgrader']
 
         # only add cell type if the checksum has also already been set
@@ -21,11 +22,11 @@ class MetadataValidatorV2(BaseMetadataValidator):
             self.log.warning("Cell does not have a stored cell type! Adding default cell type.")
             meta['cell_type'] = cell.cell_type
 
-        meta['schema_version'] = 2
+        meta['schema_version'] = self.schema_version
 
         return cell
 
-    def upgrade_cell_metadata(self, cell):
+    def upgrade_cell_metadata(self, cell: NotebookNode) -> NotebookNode:
         if 'nbgrader' not in cell.metadata:
             return cell
 
@@ -43,7 +44,7 @@ class MetadataValidatorV2(BaseMetadataValidator):
         self._remove_extra_keys(cell)
         return cell
 
-    def validate_cell(self, cell):
+    def validate_cell(self, cell: NotebookNode) -> None:
         super(MetadataValidatorV2, self).validate_cell(cell)
 
         if 'nbgrader' not in cell.metadata:
@@ -82,7 +83,7 @@ class MetadataValidatorV2(BaseMetadataValidator):
             raise ValidationError(
                 "Markdown solution cell is not marked as a grade cell: {}".format(cell.source))
 
-    def validate_nb(self, nb):
+    def validate_nb(self, nb: NotebookNode) -> None:
         super(MetadataValidatorV2, self).validate_nb(nb)
 
         ids = set([])
@@ -104,23 +105,23 @@ class MetadataValidatorV2(BaseMetadataValidator):
             ids.add(grade_id)
 
 
-def read_v2(source, as_version, **kwargs):
+def read_v2(source: typing.io.TextIO, as_version: int, **kwargs: typing.Any) -> NotebookNode:
     nb = _read(source, as_version, **kwargs)
     MetadataValidatorV2().validate_nb(nb)
     return nb
 
 
-def write_v2(nb, fp, **kwargs):
+def write_v2(nb: NotebookNode, fp: typing.io.TextIO, **kwargs: typing.Any) -> None:
     MetadataValidatorV2().validate_nb(nb)
-    return _write(nb, fp, **kwargs)
+    _write(nb, fp, **kwargs)
 
 
-def reads_v2(source, as_version, **kwargs):
+def reads_v2(source: str, as_version: int, **kwargs: typing.Any) -> NotebookNode:
     nb = _reads(source, as_version, **kwargs)
     MetadataValidatorV2().validate_nb(nb)
     return nb
 
 
-def writes_v2(nb, **kwargs):
+def writes_v2(nb: NotebookNode, **kwargs: typing.Any) -> None:
     MetadataValidatorV2().validate_nb(nb)
-    return _writes(nb, **kwargs)
+    _writes(nb, **kwargs)

@@ -1,8 +1,8 @@
 import os
+import io
 import hashlib
 import dateutil.parser
 import glob
-import six
 import sys
 import shutil
 import stat
@@ -17,6 +17,9 @@ from setuptools.archive_util import unpack_zipfile
 from tornado.log import LogFormatter
 from dateutil.tz import gettz
 from datetime import datetime
+from nbformat.notebooknode import NotebookNode
+from logging import Logger
+from typing import Optional, Tuple, Union, List, Iterator, Any
 
 # pwd is for unix passwords only, so we shouldn't import it on
 # windows machines
@@ -25,73 +28,29 @@ if sys.platform != 'win32':
 else:
     pwd = None
 
-def is_extra_cell(cell):
-    """Returns True if the cell is a form cell."""
-    if 'nbgrader' not in cell.metadata:
-        return False
-    return 'extended_cell' in cell.metadata
 
-
-def is_singlechoice(cell):
-    return is_extra_cell(cell) and cell.metadata.extended_cell.type == 'singlechoice'
-
-
-def is_multiplechoice(cell):
-    return is_extra_cell(cell) and cell.metadata.extended_cell.type == 'multiplechoice'
-
-
-def get_choices(cell):
-    if (is_singlechoice(cell) or is_multiplechoice(cell)):
-        return [int(i) for i in cell.metadata.extended_cell.choice]
-    return []
-
-
-def get_num_of_choices(cell):
-    if is_multiplechoice(cell):
-        return cell.metadata.extended_cell.num_of_choices
-
-
-def get_instructor_choices(cell):
-    if (is_singlechoice(cell) or is_multiplechoice(cell)):
-        if ('source' in cell.metadata.extended_cell and \
-            'choice' in cell.metadata.extended_cell.source):
-            return [int(i) for i in cell.metadata.extended_cell.source.choice]
-    return []
-
-
-def clear_choices(cell):
-    if is_extra_cell(cell):
-        cell.metadata.extended_cell.choice = []
-
-
-def has_solution(cell):
-    if (is_singlechoice(cell) or is_multiplechoice(cell)):
-        return 'source' in cell.metadata.extended_cell
-    return False
-
-
-def is_task(cell):
+def is_task(cell: NotebookNode) -> bool:
     """Returns True if the cell is a task cell."""
     if 'nbgrader' not in cell.metadata:
         return False
     return cell.metadata['nbgrader'].get('task', False)
 
 
-def is_grade(cell):
+def is_grade(cell: NotebookNode) -> bool:
     """Returns True if the cell is a grade cell."""
     if 'nbgrader' not in cell.metadata:
         return False
     return cell.metadata['nbgrader'].get('grade', False)
 
 
-def is_solution(cell):
+def is_solution(cell: NotebookNode) -> bool:
     """Returns True if the cell is a solution cell."""
     if 'nbgrader' not in cell.metadata:
         return False
     return cell.metadata['nbgrader'].get('solution', False)
 
 
-def is_locked(cell):
+def is_locked(cell: NotebookNode) -> bool:
     """Returns True if the cell source is locked (will be overwritten)."""
     if 'nbgrader' not in cell.metadata:
         return False
@@ -134,41 +93,13 @@ def get_partial_grade(output, max_points, log=None):
             log.warning(warning_msg)
         return max_points
 
-def determine_grade(cell, log=None):
+
+def determine_grade(cell: NotebookNode, log: Logger = None) -> Tuple[Optional[float], float]:
     if not is_grade(cell):
         raise ValueError("cell is not a grade cell")
 
     max_points = float(cell.metadata['nbgrader']['points'])
-
-    if is_extra_cell(cell):
-        if is_singlechoice(cell):
-            # Get the choices of the student
-            student_choices = get_choices(cell)
-            # Get the instructor choices
-            instructor_choices = get_instructor_choices(cell)
-
-            if (len(student_choices) > 0) and (student_choices[0] == instructor_choices[0]):
-                return max_points, max_points
-            else:
-                return 0, max_points
-
-        elif is_multiplechoice(cell):
-            # Get the choices of the student
-            student_choices = get_choices(cell)
-            # Get the weights of the answer
-            instructor_choices = get_instructor_choices(cell)
-            option_points = max_points / get_num_of_choices(cell)
-
-            points = 0
-            for i in range(get_num_of_choices(cell)):
-                if ((i in student_choices) and (i in instructor_choices)) or \
-                   ((i not in student_choices) and (i not in instructor_choices)):
-                    points += option_points
-                else:
-                    points -=option_points
-            return max(0, points), max_points
-
-    elif is_solution(cell):
+    if is_solution(cell):
         # if it's a solution cell and the checksum hasn't changed, that means
         # they didn't provide a response, so we can automatically give this a
         # zero grade
@@ -184,7 +115,7 @@ def determine_grade(cell, log=None):
         # 3. output is something else, or nothing (full credit).
         for output in cell.outputs:
             # option 1: error, return 0
-            if output.output_type == 'error':
+            if output.output_type == 'error' or output.output_type == "stream" and output.name == "stderr":
                 return 0, max_points
             # if not error, then check for option 2, partial credit
             if output.output_type == 'execute_result':
@@ -199,19 +130,12 @@ def determine_grade(cell, log=None):
         return None, max_points
 
 
-def to_bytes(string):
-    """A python 2/3 compatible function for converting a string to bytes.
-    In Python 2, this just returns the 8-bit string. In Python 3, this first
-    encodes the string to utf-8.
-
-    """
-    if sys.version_info[0] == 3 or (sys.version_info[0] == 2 and isinstance(string, unicode)):
-        return bytes(string.encode('utf-8'))
-    else:
-        return bytes(string)
+def to_bytes(string: str) -> bytes:
+    """A helper function for converting a string to bytes with utf-8 encoding."""
+    return bytes(string.encode('utf-8'))
 
 
-def compute_checksum(cell):
+def compute_checksum(cell: NotebookNode) -> str:
     m = hashlib.md5()
     # add the cell source and type
     m.update(to_bytes(cell.source))
@@ -232,11 +156,11 @@ def compute_checksum(cell):
     return m.hexdigest()
 
 
-def parse_utc(ts):
+def parse_utc(ts: Union[datetime, str]) -> datetime:
     """Parses a timestamp into datetime format, converting it to UTC if necessary."""
     if ts is None:
         return None
-    if isinstance(ts, six.string_types):
+    if isinstance(ts, str):
         parts = ts.split(" ")
         if len(parts) == 3:
             ts = " ".join(parts[:2] + ["TZ"])
@@ -317,7 +241,7 @@ def self_owned(path):
     return get_osusername() == find_owner(os.path.abspath(path))
 
 
-def is_ignored(filename, ignore_globs=None):
+def is_ignored(filename: str, ignore_globs: List[str] = None) -> bool:
     """Determines whether a filename should be ignored, based on whether it
     matches any file glob in the given list. Note that this only matches on the
     base filename itself, not the full path."""
@@ -384,7 +308,7 @@ def ignore_patterns(exclude=None, include=None, max_file_size=None, log=None):
     return ignore_patterns
 
 
-def find_all_files(path, exclude=None):
+def find_all_files(path: str, exclude: List[str] = None) -> List[str]:
     """Recursively finds all filenames rooted at `path`, optionally excluding
     some based on filename globs."""
     files = []
@@ -413,7 +337,7 @@ def find_all_notebooks(path):
     return notebooks
 
 
-def full_split(path):
+def full_split(path: str) -> Tuple[str, ...]:
     rest, last = os.path.split(path)
     if last == path:
         return (path,)
@@ -422,20 +346,9 @@ def full_split(path):
     else:
         return full_split(rest) + (last,)
 
-def compute_hashcode(filename, method='md5'):
-    if method=='md5':
-        hashcode = hashlib.md5()
-    elif method=='sha1':
-        hashcode = hashlib.sha1()
-
-    with open(filename, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hashcode.update(chunk)
-            
-    return hashcode.hexdigest()
 
 @contextlib.contextmanager
-def chdir(dirname):
+def chdir(dirname: str) -> Iterator:
     currdir = os.getcwd()
     if dirname:
         os.chdir(dirname)
@@ -446,8 +359,8 @@ def chdir(dirname):
 
 
 @contextlib.contextmanager
-def setenv(**kwargs):
-    previous_env = { }
+def setenv(**kwargs: Any) -> Iterator:
+    previous_env = {}
     for key, value in kwargs.items():
         previous_env[key] = os.environ.get(value)
         os.environ[key] = value
@@ -459,7 +372,7 @@ def setenv(**kwargs):
             os.environ[key] = previous_env[key]
 
 
-def rmtree(path):
+def rmtree(path: str) -> None:
     # for windows, we need to go through and make sure everything
     # is writeable, otherwise rmtree will fail
     if sys.platform == 'win32':
@@ -472,7 +385,7 @@ def rmtree(path):
     shutil.rmtree(path)
 
 
-def remove(path):
+def remove(path: str) -> None:
     # for windows, we need to make sure that the file is writeable,
     # otherwise remove will fail
     if sys.platform == 'win32':
@@ -588,7 +501,7 @@ def capture_log(app, fmt="[%(levelname)s] %(message)s"):
         - log (string): captured log output
 
     """
-    log_buff = six.StringIO()
+    log_buff = io.StringIO()
     handler = logging.StreamHandler(log_buff)
     formatter = LogFormatter(fmt="[%(levelname)s] %(message)s")
     handler.setFormatter(formatter)
@@ -630,4 +543,3 @@ def notebook_hash(path, unique_key=None):
 def make_unique_key(course_id, assignment_id, notebook_id, student_id, timestamp):
     return "+".join([
         course_id, assignment_id, notebook_id, student_id, timestamp])
-

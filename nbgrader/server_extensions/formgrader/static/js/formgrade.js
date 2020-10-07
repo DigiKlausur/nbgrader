@@ -124,7 +124,7 @@ FormGrader.prototype.loadComments = function () {
 };
 
 FormGrader.prototype.navigateTo = function (location) {
-    return this.base_url + '/submissions/' + this.submission_id + '/' + location + '?index=' + this.current_index + "&task=" + task_id;
+    return this.base_url + '/submissions/' + this.submission_id + '/' + location + '?index=' + this.current_index;
 };
 
 FormGrader.prototype.nextAssignment = function () {
@@ -328,6 +328,6 @@ FormGrader.prototype.flag = function () {
 };
 
 var formgrader = new FormGrader(base_url, submission_id);
-$(window).load(function () {
+$(window).on('load', function () {
     formgrader.init()
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Copyright (c) Juptyer Development Team.
+# Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
 import os
@@ -68,8 +68,6 @@ setup_args = dict(
     classifiers=[
         'License :: OSI Approved :: BSD License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
@@ -93,19 +91,16 @@ setup_args = dict(
         "python-dateutil",
         "jupyter",
         "notebook>=4.2",
-        "nbconvert>=5.6",
+        "nbconvert==5.6.1",
         "nbformat",
-        "traitlets",
+        "traitlets==4.3.3",
         "jupyter_core",
         "jupyter_client",
         "tornado",
-        "six>=1.11",  # jsonschema needs >=1.11
         "requests",
         "jsonschema",
         "alembic",
-        "fuzzywuzzy",
-        "bs4",
-        "pandas"
+        "rapidfuzz"
     ]
 )
 

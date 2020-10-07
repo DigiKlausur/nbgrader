@@ -1,7 +1,7 @@
 var SubmittedNotebook = Backbone.Model.extend({});
 var SubmittedNotebooks = Backbone.Collection.extend({
     model: SubmittedNotebook,
-    url: base_url + "/formgrader/api/submitted_" + view + "s/" + assignment_id + "/" + notebook_id + task_id
+    url: base_url + "/formgrader/api/submitted_notebooks/" + assignment_id + "/" + notebook_id
 });
 
 var SubmittedNotebookUI = Backbone.View.extend({
@@ -66,11 +66,11 @@ var SubmittedNotebookUI = Backbone.View.extend({
         this.$name.attr("data-order", this.model.get("index"));
         this.$name.append($("<a/>")
             .addClass("name-hidden")
-            .attr("href", base_url + "/formgrader/submissions/" + this.model.get("id") + "/?task=" + task_id.substr(1))
+            .attr("href", base_url + "/formgrader/submissions/" + this.model.get("id"))
             .text("Submission #" + (this.model.get("index") + 1)));
         this.$name.append($("<a/>")
             .addClass("name-shown")
-            .attr("href", base_url + "/formgrader/submissions/" + this.model.get("id") + "/?task=" + task_id.substr(1))
+            .attr("href", base_url + "/formgrader/submissions/" + this.model.get("id"))
             .text(name));
 
         // score
@@ -83,37 +83,36 @@ var SubmittedNotebookUI = Backbone.View.extend({
         }
         this.$score.text(score + " / " + max_score);
 
-        if (view !== 'task') {
-            // code score
-            score = roundToPrecision(this.model.get("code_score"), 2);
-            max_score = roundToPrecision(this.model.get("max_code_score"), 2);
-            if (max_score === 0) {
-                this.$code_score.attr("data-order", 0.0);
-            } else {
-                this.$code_score.attr("data-order", score / max_score);
-            }
-            this.$code_score.text(score + " / " + max_score);
-
-            // written score
-            score = roundToPrecision(this.model.get("written_score"), 2);
-            max_score = roundToPrecision(this.model.get("max_written_score"), 2);
-            if (max_score === 0) {
-                this.$written_score.attr("data-order", 0.0);
-            } else {
-                this.$written_score.attr("data-order", score / max_score);
-            }
-            this.$written_score.text(score + " / " + max_score);
-
-            // task score
-            score = roundToPrecision(this.model.get("task_score"), 2);
-            max_score = roundToPrecision(this.model.get("max_task_score"), 2);
-            if (max_score === 0) {
-                this.$task_score.attr("data-order", 0.0);
-            } else {
-                this.$task_score.attr("data-order", score / max_score);
-            }
-            this.$task_score.text(score + " / " + max_score);
+        // code score
+        score = roundToPrecision(this.model.get("code_score"), 2);
+        max_score = roundToPrecision(this.model.get("max_code_score"), 2);
+        if (max_score === 0) {
+            this.$code_score.attr("data-order", 0.0);
+        } else {
+            this.$code_score.attr("data-order", score / max_score);
         }
+        this.$code_score.text(score + " / " + max_score);
+
+        // written score
+        score = roundToPrecision(this.model.get("written_score"), 2);
+        max_score = roundToPrecision(this.model.get("max_written_score"), 2);
+        if (max_score === 0) {
+            this.$written_score.attr("data-order", 0.0);
+        } else {
+            this.$written_score.attr("data-order", score / max_score);
+        }
+        this.$written_score.text(score + " / " + max_score);
+
+        // task score
+        score = roundToPrecision(this.model.get("task_score"), 2);
+        max_score = roundToPrecision(this.model.get("max_task_score"), 2);
+        if (max_score === 0) {
+            this.$task_score.attr("data-order", 0.0);
+        } else {
+            this.$task_score.attr("data-order", score / max_score);
+        }
+        this.$task_score.text(score + " / " + max_score);
+        
         // needs manual grade?
         if (this.model.get("needs_manual_grade")) {
             this.$needs_manual_grade.attr("data-search", "needs manual grade");
@@ -190,6 +189,6 @@ var loadSubmittedNotebooks = function () {
 
 var models = undefined;
 var views = [];
-$(window).load(function () {
+$(window).on('load', function () {
     loadSubmittedNotebooks();
 });

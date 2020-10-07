@@ -31,7 +31,7 @@ var AssignmentUI = Backbone.View.extend({
         var name = this.model.get("name");
         this.$name.attr("data-order", name);
         this.$name.append($("<a/>")
-            .attr("href", base_url + "/formgrader/gradebook/" + name + "/?view=" + view)
+            .attr("href", base_url + "/formgrader/gradebook/" + name)
             .text(name));
 
         // duedate
@@ -96,6 +96,6 @@ var loadAssignments = function () {
 
 var models = undefined;
 var views = [];
-$(window).load(function () {
+$(window).on('load', function () {
     loadAssignments();
 });

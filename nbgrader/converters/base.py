@@ -5,6 +5,7 @@ import shutil
 import sqlalchemy
 import traceback
 
+from rapidfuzz import fuzz
 from traitlets.config import LoggingConfigurable, Config
 from traitlets import Bool, List, Dict, Integer, Instance, Type
 from traitlets import default
@@ -16,6 +17,8 @@ from ..coursedir import CourseDirectory
 from ..utils import find_all_files, rmtree, remove
 from ..preprocessors.execute import UnresponsiveKernelError
 from ..nbgraderformat import SchemaTooOldError, SchemaTooNewError
+import typing
+from nbconvert.exporters.exporter import ResourcesDict
 
 
 class NbGraderException(Exception):
@@ -45,12 +48,12 @@ class BaseConverter(LoggingConfigurable):
     ).tag(config=True)
 
     @default("permissions")
-    def _permissions_default(self):
+    def _permissions_default(self) -> int:
         return 664 if self.coursedir.groupshared else 444
 
     coursedir = Instance(CourseDirectory, allow_none=True)
 
-    def __init__(self, coursedir=None, **kwargs):
+    def __init__(self, coursedir: CourseDirectory = None, **kwargs: typing.Any) -> None:
         self.coursedir = coursedir
         super(BaseConverter, self).__init__(**kwargs)
         if self.parent and hasattr(self.parent, "logfile"):
@@ -62,7 +65,7 @@ class BaseConverter(LoggingConfigurable):
         c.Exporter.default_preprocessors = []
         self.update_config(c)
 
-    def start(self):
+    def start(self) -> None:
         self.init_notebooks()
         self.writer = FilesWriter(parent=self, config=self.config)
         self.exporter = self.exporter_class(parent=self, config=self.config)
@@ -93,13 +96,13 @@ class BaseConverter(LoggingConfigurable):
     def _output_directory(self):
         raise NotImplementedError
 
-    def _format_source(self, assignment_id, student_id, escape=False):
+    def _format_source(self, assignment_id: str, student_id: str, escape: bool = False) -> str:
         return self.coursedir.format_path(self._input_directory, student_id, assignment_id, escape=escape)
 
-    def _format_dest(self, assignment_id, student_id, escape=False):
+    def _format_dest(self, assignment_id: str, student_id: str, escape: bool = False) -> str:
         return self.coursedir.format_path(self._output_directory, student_id, assignment_id, escape=escape)
 
-    def init_notebooks(self):
+    def init_notebooks(self) -> None:
         self.assignments = {}
         self.notebooks = []
         assignment_glob = self._format_source(self.coursedir.assignment_id, self.coursedir.student_id)
@@ -118,17 +121,12 @@ class BaseConverter(LoggingConfigurable):
             assignment_glob2 = self._format_source("*", self.coursedir.student_id)
             found = glob.glob(assignment_glob2)
             if found:
-                # Normally it is a bad idea to put imports in the middle of
-                # a function, but we do this here because otherwise fuzzywuzzy
-                # prints an annoying message about python-Levenshtein every
-                # time nbgrader is run.
-                from fuzzywuzzy import fuzz
                 scores = sorted([(fuzz.ratio(assignment_glob, x), x) for x in found])
                 self.log.error("Did you mean: %s", scores[-1][1])
 
             raise NbGraderException(msg)
 
-    def init_single_notebook_resources(self, notebook_filename):
+    def init_single_notebook_resources(self, notebook_filename: str) -> typing.Dict[str, typing.Any]:
         regexp = re.escape(os.path.sep).join([
             self._format_source("(?P<assignment_id>.*)", "(?P<student_id>.*)", escape=True),
             "(?P<notebook_id>.*).ipynb"
@@ -158,7 +156,7 @@ class BaseConverter(LoggingConfigurable):
 
         return resources
 
-    def write_single_notebook(self, output, resources):
+    def write_single_notebook(self, output: str, resources: ResourcesDict) -> None:
         # configure the writer build directory
         self.writer.build_directory = self._format_dest(
             resources['nbgrader']['assignment'], resources['nbgrader']['student'])
@@ -166,7 +164,7 @@ class BaseConverter(LoggingConfigurable):
         # write out the results
         self.writer.write(output, resources, notebook_name=resources['unique_key'])
 
-    def init_destination(self, assignment_id, student_id):
+    def init_destination(self, assignment_id: str, student_id: str) -> bool:
         """Initialize the destination for an assignment. Returns whether the
         assignment should actually be processed or not (i.e. whether the
         initialization was successful).
@@ -228,7 +226,7 @@ class BaseConverter(LoggingConfigurable):
         self.log.info("Skipping existing assignment: {}".format(dest))
         return False
 
-    def init_assignment(self, assignment_id, student_id):
+    def init_assignment(self, assignment_id: str, student_id: str) -> None:
         """Initializes resources/dependencies/etc. that are common to all
         notebooks in an assignment.
 
@@ -247,7 +245,7 @@ class BaseConverter(LoggingConfigurable):
             self.log.info("Copying %s -> %s", filename, path)
             shutil.copy(filename, path)
 
-    def set_permissions(self, assignment_id, student_id):
+    def set_permissions(self, assignment_id: str, student_id: str) -> None:
         self.log.info("Setting destination file permissions to %s", self.permissions)
         dest = os.path.normpath(self._format_dest(assignment_id, student_id))
         permissions = int(str(self.permissions), 8)
@@ -277,25 +275,24 @@ class BaseConverter(LoggingConfigurable):
                 except PermissionError:
                     self.log.warning("Could not update permissions of %s to make it groupshared", rootdir)
 
-
-    def convert_single_notebook(self, notebook_filename):
-        """Convert a single notebook.
+    def convert_single_notebook(self, notebook_filename: str) -> None:
+        """
+        Convert a single notebook.
 
         Performs the following steps:
             1. Initialize notebook resources
             2. Export the notebook to a particular format
             3. Write the exported notebook to file
-
         """
         self.log.info("Converting notebook %s", notebook_filename)
         resources = self.init_single_notebook_resources(notebook_filename)
         output, resources = self.exporter.from_filename(notebook_filename, resources=resources)
         self.write_single_notebook(output, resources)
 
-    def convert_notebooks(self):
+    def convert_notebooks(self) -> None:
         errors = []
 
-        def _handle_failure(gd):
+        def _handle_failure(gd: typing.Dict[str, str]) -> None:
             dest = os.path.normpath(self._format_dest(gd['assignment_id'], gd['student_id']))
             if self.coursedir.notebook_id == "*":
                 if os.path.exists(dest):

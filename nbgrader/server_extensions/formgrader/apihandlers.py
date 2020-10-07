@@ -5,7 +5,6 @@ from tornado import web
 
 from .base import BaseApiHandler, check_xsrf, check_notebook_dir
 from ...api import MissingEntry
-from ...exchange import ExchangeList
 
 
 class StatusHandler(BaseApiHandler):
@@ -312,22 +311,6 @@ class ReleaseFeedbackHandler(BaseApiHandler):
         self.write(json.dumps(self.api.release_feedback(assignment_id, student_id)))
 
 
-class SolutionCellCollectionHandler(BaseApiHandler):
-    @web.authenticated
-    @check_xsrf
-    def get(self, assignment_id, notebook_id):
-        cells = self.api.get_solution_cell_ids(assignment_id, notebook_id)
-        self.write(json.dumps(cells))
-
-
-class SubmittedTaskCollectionHandler(BaseApiHandler):
-    @web.authenticated
-    @check_xsrf
-    def get(self, assignment_id, notebook_id, task_id):
-        submissions = self.api.get_task_submissions(assignment_id, notebook_id, task_id)
-        self.write(json.dumps(submissions))
-
-
 default_handlers = [
     (r"/formgrader/api/status", StatusHandler),
 
@@ -362,7 +345,4 @@ default_handlers = [
 
     (r"/formgrader/api/student_submissions/([^/]+)", StudentSubmissionCollectionHandler),
     (r"/formgrader/api/student_notebook_submissions/([^/]+)/([^/]+)", StudentNotebookSubmissionCollectionHandler),
-
-    (r"/formgrader/api/solution_cells/([^/]+)/([^/]+)", SolutionCellCollectionHandler),
-    (r"/formgrader/api/submitted_tasks/([^/]+)/([^/]+)/([^/]+)", SubmittedTaskCollectionHandler),
 ]

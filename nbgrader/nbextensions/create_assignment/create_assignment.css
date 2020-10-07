@@ -64,7 +64,3 @@ div.nbgrader-highlight a.lock-button {
 a.lock-editable:hover {
     cursor: pointer;
 }
-
-#nbgrader-total-points {
-  width: 5em;
-}

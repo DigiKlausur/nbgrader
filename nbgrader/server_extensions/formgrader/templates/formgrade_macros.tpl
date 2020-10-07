@@ -14,7 +14,6 @@ var submission_id = "{{ resources.submission_id }}";
 var notebook_id = "{{ resources.notebook_id }}";
 var assignment_id = "{{ resources.assignment_id }}";
 var base_url = "{{ resources.base_url }}/formgrader";
-var task_id = "{{ resources.keyword }}";
 </script>
 
 <script src="{{ resources.base_url }}/formgrader/static/js/backbone_xsrf.js"></script>
@@ -44,7 +43,7 @@ function toggle_name(on) {
       <div class="col-md-2">
         <ul class="nav navbar-nav navbar-left">
           <li class="previous">
-            <a data-toggle="tooltip" data-trigger="hover" data-placement="right" title="{{ resources.index }} remaining" href="{{ resources.base_url }}/formgrader/submissions/{{ resources.submission_id }}/prev/?task={{ resources.keyword }}">
+            <a data-toggle="tooltip" data-trigger="hover" data-placement="right" title="{{ resources.index }} remaining" href="{{ resources.base_url }}/formgrader/submissions/{{ resources.submission_id }}/prev">
             &larr; Prev
             </a>
           </li>
@@ -53,16 +52,9 @@ function toggle_name(on) {
       <div class="col-md-8">
         <ul class="nav text-center">
           <ul class="breadcrumb">
-            {%- if resources.keyword != '' -%}
-              <li><a href="{{ resources.base_url }}/formgrader/gradebook/?view=task">Manual Grading (Task View)</a></li>
-              <li><a href="{{ resources.base_url }}/formgrader/gradebook/{{ resources.assignment_id }}/?view=task">{{ resources.assignment_id }}</a></li>
-              <li><a href="{{ resources.base_url }}/formgrader/gradebook/tasks/{{ resources.assignment_id }}/{{ resources.notebook_id }}">{{ resources.notebook_id }}</a></li>
-              <li><a href="{{ resources.base_url }}/formgrader/gradebook/{{ resources.assignment_id }}/{{ resources.notebook_id }}/?view=task&filter={{ resources.keyword }}">{{ resources.keyword }}</a></li>
-            {%- else -%}
-              <li><a href="{{ resources.base_url }}/formgrader/gradebook">Manual Grading</a></li>
-              <li><a href="{{ resources.base_url }}/formgrader/gradebook/{{ resources.assignment_id }}">{{ resources.assignment_id }}</a></li>
-              <li><a href="{{ resources.base_url }}/formgrader/gradebook/{{ resources.assignment_id }}/{{ resources.notebook_id }}">{{ resources.notebook_id }}</a></li>
-            {%- endif -%}
+            <li><a href="{{ resources.base_url }}/formgrader/gradebook">Manual Grading</a></li>
+            <li><a href="{{ resources.base_url }}/formgrader/gradebook/{{ resources.assignment_id }}">{{ resources.assignment_id }}</a></li>
+            <li><a href="{{ resources.base_url }}/formgrader/gradebook/{{ resources.assignment_id }}/{{ resources.notebook_id }}">{{ resources.notebook_id }}</a></li>
             <li class="active live-notebook">
               <a class="name-hidden" data-toggle="tooltip" data-placement="bottom" title="Open live notebook" target="_blank" href="{{ resources.base_url }}/notebooks/{{ resources.notebook_path }}">
                 Submission #{{ resources.index + 1 }}
@@ -83,7 +75,7 @@ function toggle_name(on) {
       <div class="col-md-2">
         <ul class="nav navbar-nav navbar-right">
           <li class="next">
-            <a class="tabbable" data-trigger="hover" data-toggle="tooltip" data-placement="left" title="{{ resources.total - (resources.index + 1) }} remaining" href="{{ resources.base_url }}/formgrader/submissions/{{ resources.submission_id }}/next/?task={{ resources.keyword }}">
+            <a class="tabbable" data-trigger="hover" data-toggle="tooltip" data-placement="left" title="{{ resources.total - (resources.index + 1) }} remaining" href="{{ resources.base_url }}/formgrader/submissions/{{ resources.submission_id }}/next">
             Next &rarr;
             </a>
           </li>

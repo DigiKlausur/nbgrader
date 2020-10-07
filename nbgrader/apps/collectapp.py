@@ -20,6 +20,10 @@ flags.update({
         {'ExchangeCollect' : {'update': True}},
         "Update existing submissions with ones that have newer timestamps."
     ),
+    'before-duedate': (
+        {'ExchangeCollect' : {'before_duedate': True}},
+        "Collect the last submission before due date or the last submission if no submission before due date."
+    ),
 })
 
 class CollectApp(NbGrader):
@@ -92,7 +96,7 @@ class CollectApp(NbGrader):
         elif self.coursedir.assignment_id == "":
             self.fail("Must provide assignment name:\nnbgrader <command> ASSIGNMENT [ --course COURSE ]")
 
-        collect = ExchangeCollect(
+        collect = self.exchange.Collect(
             coursedir=self.coursedir,
             authenticator=self.authenticator,
             parent=self)

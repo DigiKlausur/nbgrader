@@ -6,20 +6,19 @@ import json
 import traceback
 
 from tornado import web
-from tornado.httpclient import AsyncHTTPClient, HTTPClientError
+from tornado.httpclient import AsyncHTTPClient, HTTPError
 from tornado import gen
 from textwrap import dedent
-from six.moves import urllib
+from urllib.parse import urlparse
 
 from notebook.utils import url_path_join as ujoin
 from notebook.base.handlers import IPythonHandler
-from traitlets.config import Config
 from jupyter_core.paths import jupyter_config_path
 
 from ...apps import NbGrader
 from ...auth import Authenticator
 from ...auth.jupyterhub import (JupyterhubEnvironmentError, get_jupyterhub_api_url,
-    get_jupyterhub_authorization, get_jupyterhub_url, get_jupyterhub_user)
+                                get_jupyterhub_authorization, get_jupyterhub_user)
 from ...coursedir import CourseDirectory
 from ... import __version__ as nbgrader_version
 
@@ -39,24 +38,19 @@ class CourseListHandler(IPythonHandler):
         return self.settings['assignment_dir']
 
     def get_base_url(self):
-        parts = list(urllib.parse.urlsplit(self.request.full_url()))
-        base_url = parts[0] + "://" + parts[1]
+        parts = urlparse(self.request.full_url())
+        base_url = parts.scheme + "://" + parts.netloc
         return base_url.rstrip("/")
 
     def load_config(self):
         paths = jupyter_config_path()
         paths.insert(0, os.getcwd())
 
-        config_found = False
-        full_config = Config()
-        for config in NbGrader._load_config_files("nbgrader_config", path=paths, log=self.log):
-            full_config.merge(config[0])
-            config_found = True
+        app = NbGrader()
+        app.config_file_paths.append(paths)
+        app.load_config_file()
 
-        if not config_found:
-            self.log.warning("No nbgrader_config.py file found. Rerun with DEBUG log level to see where nbgrader is looking.")
-
-        return full_config
+        return app.config
 
     @gen.coroutine
     def check_for_local_formgrader(self, config):
@@ -66,8 +60,8 @@ class CourseListHandler(IPythonHandler):
         header = {"Authorization": "token {}".format(self.token)}
         http_client = AsyncHTTPClient()
         try:
-            response = yield http_client.fetch(url, headers=header, validate_cert=False)
-        except HTTPClientError:
+            response = yield http_client.fetch(url, headers=header)
+        except HTTPError:
             # local formgrader isn't running
             self.log.warning("Local formgrader does not seem to be running")
             raise gen.Return([])
@@ -80,9 +74,11 @@ class CourseListHandler(IPythonHandler):
             self.log.error(traceback.format_exc())
             raise gen.Return([])
 
+        coursedir = CourseDirectory(config=config)
+
         if status:
             raise gen.Return([{
-                'course_id': config.CourseDirectory.course_id,
+                'course_id': coursedir.course_id,
                 'url': base_url + '/formgrader',
                 'kind': 'local'
             }])
@@ -101,6 +97,7 @@ class CourseListHandler(IPythonHandler):
         # We are running on JupyterHub, so maybe there's a formgrader
         # service. Check if we have a course id and if so guess the path to the
         # formgrader.
+
         coursedir = CourseDirectory(config=config)
         if not coursedir.course_id:
             raise gen.Return([])
@@ -174,6 +171,7 @@ class CourseListHandler(IPythonHandler):
                 courses = []
                 local_courses = yield self.check_for_local_formgrader(config)
                 jhub_courses = yield self.check_for_jupyterhub_formgraders(config)
+
                 courses.extend(local_courses)
                 courses.extend(jhub_courses)
 

@@ -14,9 +14,9 @@ from traitlets import Unicode, default
 from traitlets.config import LoggingConfigurable, Config
 from jupyter_core.paths import jupyter_config_path
 
+from ...exchange import ExchangeFactory, ExchangeError
 from ...apps import NbGrader
 from ...coursedir import CourseDirectory
-from ...exchange import ExchangeList, ExchangeFetchAssignment, ExchangeFetchFeedback, ExchangeSubmit
 from ...auth import Authenticator
 from ... import __version__ as nbgrader_version
 
@@ -38,16 +38,11 @@ class AssignmentList(LoggingConfigurable):
         paths = jupyter_config_path()
         paths.insert(0, os.getcwd())
 
-        config_found = False
-        full_config = Config()
-        for config in NbGrader._load_config_files("nbgrader_config", path=paths, log=self.log):
-            full_config.merge(config[0])
-            config_found = True
+        app = NbGrader()
+        app.config_file_paths.append(paths)
+        app.load_config_file()
 
-        if not config_found:
-            self.log.warning("No nbgrader_config.py file found. Rerun with DEBUG log level to see where nbgrader is looking.")
-
-        return full_config
+        return app.config
 
     @contextlib.contextmanager
     def get_assignment_dir_config(self):
@@ -55,14 +50,17 @@ class AssignmentList(LoggingConfigurable):
         with chdir(self.parent.notebook_dir):
             config = self.load_config()
 
-        lister = ExchangeList(config=config)
+        lister = ExchangeFactory(config=config).List(config=config)
         assignment_dir = lister.assignment_dir
 
         # now cd to the full assignment directory and load the config again
         with chdir(assignment_dir):
-            for new_config in NbGrader._load_config_files("nbgrader_config", path=[os.getcwd()], log=self.log):
-                config.merge(new_config)
-            yield config
+
+            app = NbGrader()
+            app.config_file_paths.append(os.getcwd())
+            app.load_config_file()
+
+            yield app.config
 
     def list_released_assignments(self, course_id=None):
         with self.get_assignment_dir_config() as config:
@@ -72,19 +70,29 @@ class AssignmentList(LoggingConfigurable):
 
                 coursedir = CourseDirectory(config=config)
                 authenticator = Authenticator(config=config)
-                lister = ExchangeList(
+                lister = ExchangeFactory(config=config).List(
                     coursedir=coursedir,
                     authenticator=authenticator,
                     config=config)
                 assignments = lister.start()
 
-            except:
+            except Exception as e:
                 self.log.error(traceback.format_exc())
-                retvalue = {
-                    "success": False,
-                    "value": traceback.format_exc()
-                }
-
+                if isinstance(e, ExchangeError):
+                    retvalue = {
+                        "success": False,
+                        "value": """The exchange directory does not exist and could
+                                    not be created. The "release" and "collect" functionality will not be available.
+                                    Please see the documentation on
+                                    http://nbgrader.readthedocs.io/en/stable/user_guide/managing_assignment_files.html#setting-up-the-exchange
+                                    for instructions.
+                                """
+                    }
+                else:
+                    retvalue = {
+                        "success": False,
+                        "value": traceback.format_exc()
+                    }
             else:
                 for assignment in assignments:
                     if assignment['status'] == 'fetched':
@@ -107,19 +115,29 @@ class AssignmentList(LoggingConfigurable):
 
                 coursedir = CourseDirectory(config=config)
                 authenticator = Authenticator(config=config)
-                lister = ExchangeList(
+                lister = ExchangeFactory(config=config).List(
                     coursedir=coursedir,
                     authenticator=authenticator,
                     config=config)
                 assignments = lister.start()
 
-            except:
+            except Exception as e:
                 self.log.error(traceback.format_exc())
-                retvalue = {
-                    "success": False,
-                    "value": traceback.format_exc()
-                }
-
+                if isinstance(e, ExchangeError):
+                    retvalue = {
+                        "success": False,
+                        "value": """The exchange directory does not exist and could
+                                    not be created. The "release" and "collect" functionality will not be available.
+                                    Please see the documentation on
+                                    http://nbgrader.readthedocs.io/en/stable/user_guide/managing_assignment_files.html#setting-up-the-exchange
+                                    for instructions.
+                                """
+                    }
+                else:
+                    retvalue = {
+                        "success": False,
+                        "value": traceback.format_exc()
+                    }
             else:
                 for assignment in assignments:
                     assignment["submissions"] = sorted(
@@ -170,7 +188,7 @@ class AssignmentList(LoggingConfigurable):
 
                 coursedir = CourseDirectory(config=config)
                 authenticator = Authenticator(config=config)
-                fetch = ExchangeFetchAssignment(
+                fetch = ExchangeFactory(config=config).FetchAssignment(
                     coursedir=coursedir,
                     authenticator=authenticator,
                     config=config)
@@ -200,7 +218,7 @@ class AssignmentList(LoggingConfigurable):
 
                 coursedir = CourseDirectory(config=config)
                 authenticator = Authenticator(config=config)
-                fetch = ExchangeFetchFeedback(
+                fetch = ExchangeFactory(config=config).FetchFeedback(
                     coursedir=coursedir,
                     authenticator=authenticator,
                     config=config)
@@ -230,7 +248,7 @@ class AssignmentList(LoggingConfigurable):
 
                 coursedir = CourseDirectory(config=config)
                 authenticator = Authenticator(config=config)
-                submit = ExchangeSubmit(
+                submit = ExchangeFactory(config=config).Submit(
                     coursedir=coursedir,
                     authenticator=authenticator,
                     config=config)

@@ -16,10 +16,6 @@ from .latesubmissions import AssignLatePenalties
 from .clearhiddentests import ClearHiddenTests
 from .clearmarkingscheme import ClearMarkScheme
 from .overwritekernelspec import OverwriteKernelspec
-from .unscramble import Unscramble
-from .filtercellsbyid import FilterCellsById
-from .scramble import Scramble
-from .permutetasks import PermuteTasks
 
 __all__ = [
     "AssignLatePenalties",
@@ -39,8 +35,4 @@ __all__ = [
     "ClearHiddenTests",
     "ClearMarkScheme",
     "OverwriteKernelspec",
-    "Unscramble",
-    "FilterCellsById",
-    "Scramble",
-    "PermuteTasks"
 ]

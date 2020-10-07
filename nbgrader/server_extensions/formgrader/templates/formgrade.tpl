@@ -105,7 +105,7 @@
     {{ nbgrader_heading(cell) }}
     <div class="panel-body">
       <div class="text_cell_render border-box-sizing rendered_html">
-        {{ cell.source  | markdown2html | strip_files_prefix | to_choicecell }}
+        {{ cell.source  | markdown2html | strip_files_prefix }}
       </div>
     </div>
     {{ nbgrader_footer(cell) }}

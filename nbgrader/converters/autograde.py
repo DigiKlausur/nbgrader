@@ -7,7 +7,7 @@ from traitlets import Bool, List, Dict
 from .base import BaseConverter, NbGraderException
 from ..preprocessors import (
     AssignLatePenalties, ClearOutput, DeduplicateIds, OverwriteCells, SaveAutoGrades,
-    Execute, LimitOutput, OverwriteKernelspec, CheckCellMetadata, Unscramble)
+    Execute, LimitOutput, OverwriteKernelspec, CheckCellMetadata)
 from ..api import Gradebook, MissingEntry
 from .. import utils
 
@@ -40,14 +40,14 @@ class Autograde(BaseConverter):
     _sanitizing = True
 
     @property
-    def _input_directory(self):
+    def _input_directory(self) -> str:
         if self._sanitizing:
             return self.coursedir.submitted_directory
         else:
             return self.coursedir.autograded_directory
 
     @property
-    def _output_directory(self):
+    def _output_directory(self) -> str:
         return self.coursedir.autograded_directory
 
     sanitize_preprocessors = List([
@@ -55,28 +55,23 @@ class Autograde(BaseConverter):
         DeduplicateIds,
         OverwriteKernelspec,
         OverwriteCells,
-        CheckCellMetadata,
-        Unscramble
-    ])
+        CheckCellMetadata
+    ]).tag(config=True)
     autograde_preprocessors = List([
         Execute,
         LimitOutput,
         SaveAutoGrades,
         AssignLatePenalties,
         CheckCellMetadata
-    ])
+    ]).tag(config=True)
 
     preprocessors = List([])
 
-    def init_assignment(self, assignment_id, student_id):
+    def init_assignment(self, assignment_id: str, student_id: str) -> None:
         super(Autograde, self).init_assignment(assignment_id, student_id)
         # try to get the student from the database, and throw an error if it
         # doesn't exist
         student = {}
-        for s in self.coursedir.db_students:
-            if s['id'] == student_id:
-                student = s.copy()
-                break
 
         if student or self.create_student:
             if 'id' in student:
@@ -172,7 +167,7 @@ class Autograde(BaseConverter):
                         grade.needs_manual_grade = False
                     gb.db.commit()
 
-    def _init_preprocessors(self):
+    def _init_preprocessors(self) -> None:
         self.exporter._preprocessors = []
         if self._sanitizing:
             preprocessors = self.sanitize_preprocessors
@@ -182,7 +177,7 @@ class Autograde(BaseConverter):
         for pp in preprocessors:
             self.exporter.register_preprocessor(pp)
 
-    def convert_single_notebook(self, notebook_filename):
+    def convert_single_notebook(self, notebook_filename: str) -> None:
         self.log.info("Sanitizing %s", notebook_filename)
         self._sanitizing = True
         self._init_preprocessors()

@@ -5,13 +5,14 @@ from traitlets.config import Config
 
 from ..auth import Authenticator, JupyterHubAuthPlugin
 from ..auth.jupyterhub import JupyterhubEnvironmentError, JupyterhubApiError
+from _pytest.fixtures import SubRequest
 
 
 @pytest.fixture
-def env(request):
+def env(request: SubRequest) -> dict:
     old_env = os.environ.copy()
 
-    def fin():
+    def fin() -> None:
         os.environ = old_env
     request.addfinalizer(fin)
 
@@ -19,7 +20,7 @@ def env(request):
 
 
 @pytest.fixture
-def jupyterhub_auth():
+def jupyterhub_auth() -> Authenticator:
     config = Config()
     config.Authenticator.plugin_class = JupyterHubAuthPlugin
     auth = Authenticator(config=config)
@@ -52,27 +53,53 @@ def test_default_authenticator():
 
 
 def test_jupyterhub_get_student_courses(env, jupyterhub_auth):
-    # this will fail, because the api token hasn't been set
+    # this will fail, because the user hasn't been set
+    env['JUPYTERHUB_API_TOKEN'] = 'abcd1234'
+    env['JUPYTERHUB_USER'] = ''
     with pytest.raises(JupyterhubEnvironmentError):
         jupyterhub_auth.get_student_courses('foo')
 
-    # should still fail, because the user hasn't been set
-    env['JUPYTERHUB_API_TOKEN'] = 'abcd1234'
+    # this will fail, because the api token hasn't been set
+    env['JUPYTERHUB_API_TOKEN'] = ''
+    env['JUPYTERHUB_USER'] = 'foo'
     with pytest.raises(JupyterhubEnvironmentError):
         jupyterhub_auth.get_student_courses('foo')
 
     # should fail, because the server returns a forbidden response
+    env['JUPYTERHUB_API_TOKEN'] = 'abcd1234'
     env['JUPYTERHUB_USER'] = 'foo'
     with requests_mock.Mocker() as m:
         _mock_api_call(m.get, '/users/foo', status_code=403)
         with pytest.raises(JupyterhubApiError):
             jupyterhub_auth.get_student_courses('foo')
 
+    # should succeed, but give no courses, because the group name is invalid
+    with requests_mock.Mocker() as m:
+        _mock_api_call(m.get, '/users/foo', json={'groups': ['nbgrader-']})
+        assert jupyterhub_auth.get_student_courses('foo') == []
+
+        _mock_api_call(m.get, '/users/foo', json={'groups': ['course101']})
+        assert jupyterhub_auth.get_student_courses('foo') == []
+
+        _mock_api_call(
+            m.get, '/users/foo', json={'groups': ['nbgrader-course123']})
+        assert jupyterhub_auth.get_student_courses('foo') == ['course123']
+
     # should succeed
     with requests_mock.Mocker() as m:
         _mock_api_call(
             m.get, '/users/foo', json={'groups': ['nbgrader-course123']})
-        assert jupyterhub_auth.get_student_courses('foo') == ['course123']
+        assert jupyterhub_auth.get_student_courses('*') == ['course123']
+
+
+def test_jupyterhub_has_access(env, jupyterhub_auth):
+    env['JUPYTERHUB_API_TOKEN'] = 'abcd1234'
+    env['JUPYTERHUB_USER'] = 'foo'
+    with requests_mock.Mocker() as m:
+        _mock_api_call(
+            m.get, '/users/foo', json={'groups': ['nbgrader-course123']})
+        assert jupyterhub_auth.has_access('foo', 'course123')
+        assert not jupyterhub_auth.has_access('foo', 'courseABC')
 
 
 def test_jupyterhub_add_student_to_course_no_token(jupyterhub_auth):
@@ -81,7 +108,7 @@ def test_jupyterhub_add_student_to_course_no_token(jupyterhub_auth):
         jupyterhub_auth.add_student_to_course('foo', 'course123')
 
 
-def test_jupyterhub_add_student_to_course_no_user(env, jupyterhub_auth):
+def test_jupyterhub_add_student_to_course_no_user(env: dict, jupyterhub_auth: Authenticator) -> None:
     # should still fail, because the user hasn't been set
     env['JUPYTERHUB_API_TOKEN'] = 'abcd1234'
     with pytest.raises(JupyterhubEnvironmentError):
@@ -98,12 +125,28 @@ def test_jupyterhub_add_student_to_course_forbidden(env, jupyterhub_auth, caplog
         assert 'ERROR' in [rec.levelname for rec in caplog.records]
 
 
+def test_jupyterhub_add_student_to_course_no_courseid(env, jupyterhub_auth, caplog):
+    # test case where something goes wrong
+    env['JUPYTERHUB_API_TOKEN'] = 'abcd1234'
+    env['JUPYTERHUB_USER'] = 'foo'
+    with requests_mock.Mocker() as m:
+        _mock_api_call(m.get, '/groups', status_code=403)
+        jupyterhub_auth.add_student_to_course('foo', None)
+        assert 'ERROR' in [rec.levelname for rec in caplog.records]
+
+
 def test_jupyterhub_add_student_to_course_success(env, jupyterhub_auth, caplog):
     env['JUPYTERHUB_API_TOKEN'] = 'abcd1234'
     env['JUPYTERHUB_USER'] = 'foo'
     with requests_mock.Mocker() as m:
         _mock_api_call(m.get, '/groups', json=[])
         _mock_api_call(m.post, '/groups/nbgrader-course123')
+        _mock_api_call(m.post, '/groups/nbgrader-course123/users')
+        jupyterhub_auth.add_student_to_course('foo', 'course123')
+        assert 'ERROR' not in [rec.levelname for rec in caplog.records]
+
+        # Check that it also works if the group already exists
+        _mock_api_call(m.get, '/groups', json=[{'name': 'nbgrader-course123'}])
         _mock_api_call(m.post, '/groups/nbgrader-course123/users')
         jupyterhub_auth.add_student_to_course('foo', 'course123')
         assert 'ERROR' not in [rec.levelname for rec in caplog.records]
@@ -129,6 +172,16 @@ def test_jupyterhub_remove_student_from_course_forbidden(env, jupyterhub_auth, c
     with requests_mock.Mocker() as m:
         _mock_api_call(m.delete, '/groups/nbgrader-course123/users', status_code=403)
         jupyterhub_auth.remove_student_from_course('foo', 'course123')
+        assert 'ERROR' in [rec.levelname for rec in caplog.records]
+
+
+def test_jupyterhub_remove_student_from_course_no_courseid(env, jupyterhub_auth, caplog):
+    # test case where something goes wrong
+    env['JUPYTERHUB_API_TOKEN'] = 'abcd1234'
+    env['JUPYTERHUB_USER'] = 'foo'
+    with requests_mock.Mocker() as m:
+        _mock_api_call(m.delete, '/groups/nbgrader-course123/users')
+        jupyterhub_auth.remove_student_from_course('foo', None)
         assert 'ERROR' in [rec.levelname for rec in caplog.records]
 
 
